@@ -1,0 +1,11 @@
+node_modules/
+dist/
+test-results/
+playwright-report/
+.review/
+.DS_Store
+*.log
+__pycache__/
+*.pyc
+references/film/
+references/review/
