@@ -161,7 +161,12 @@ function earlyCameraKeys(outcome: Outcome): readonly Key[] {
   // Stay outside the coil throughout the orbit. The lower mouth is approached
   // from the field side before circling toward the upper exit.
   keys.push([outcome==='yes'?4.50:4.57,side(outcome)*(TUBE.x-9),4.6,TUBE.z+10,side(outcome)*TUBE.x,3.0,TUBE.z,44,0],
-    [4.70,side(outcome)*(TUBE.x-8),6.2,TUBE.z+12,side(outcome)*(TUBE.x-3),3.8,TUBE.z,42,0]);
+    // The film shows the upper bore as an ellipse. The earlier lateral key
+    // reduced it to a thin edge; these fixed views retain the distant source
+    // and reveal the real opening without changing the sphere or tube.
+    outcome==='yes' ? [4.70,3.950,7.074,22.927,6.705,3.680,9.337,34,0]
+      : [4.70,-3.216,7.515,23.807,-5.897,3.984,13.308,40,0]);
+  if (outcome==='no') keys.splice(keys.length-1,0,[4.65,-3.216,7.515,23.807,-5.897,3.984,13.308,40,0]);
   return keys;
 }
 const cameras: Record<Outcome, readonly Key[]> = { yes: earlyCameraKeys('yes'), no: earlyCameraKeys('no') };
