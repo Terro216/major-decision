@@ -109,9 +109,10 @@ big-one, включая Firefox и WebKit. Физические телефоны
 
 ## Этап 4 — Docker, Caddy и выпуск
 
-Подготовлены ограниченный nginx-образ и отдельный изолированный CI-runner на
-big-one. Candidate smoke прошёл все четыре пары. Реальный публичный smoke,
-GitHub workflow и интеграция фиксируются отдельно в HANDOFF после выполнения.
+Сайт опубликован на `https://decision.ilyamedve.dev`: exact-build HTTPS smoke,
+четыре пары, TLS, Gatus и каталог портала проверены; соседи сохранены.
+GitHub workflow на отдельном изолированном big-one runner выполняет свежий
+полный набор. Итог CI и оставшийся шаг encrypted recovery export — в HANDOFF.
 
 Изученные соседние примеры: `../tick-laugh/` и `../sandbox/`: Dockerfile,
 docker-compose.yml, nginx.conf; `../../caddy/docker-compose.yml`;

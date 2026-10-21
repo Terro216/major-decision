@@ -6,7 +6,7 @@ Workflow `.github/workflows/ci.yml` запускает build и весь Playwri
 адресной операцией после проверки образа, видео и production smoke.
 
 `ci/compose.yaml` отделён от веб-сервиса. Контейнер runner работает как
-UID/GID 1001, с 2 CPU, 1536 MiB, 256 PID и shm 256 MiB. В нём находятся
+UID/GID 1001, с 2 CPU, 1536 MiB, 512 PID и shm 256 MiB. В нём находятся
 браузеры Playwright, виртуальный аудиовыход и GitHub runner. Нет Docker socket,
 host network, production checkout или учётных данных других приложений.
 После job удаляются только его внутренние checkout, зависимости и временные
@@ -61,8 +61,10 @@ docker compose -f ci/compose.yaml up -d --no-build --pull never runner
 ignored `ci/.state/.secrets` с правами 0600. Это JSON-bundle трёх штатных
 файлов runner; остальные файлы его рабочего контейнера воспроизводимы.
 Имя `.secrets` входит в существующий recovery allowlist дерева `server`.
-После первой регистрации проверить фактическое включение на обоих хостах
-и обновить encrypted recovery export по серверному runbook. Загрузка нового
+После первой регистрации проверить включение в big-one slice collector,
+равенство приватной синхронизированной копии на DE и обновить encrypted
+recovery export по серверному runbook. DE slice намеренно собирает только
+собственные хостовые секреты; файл проекта входит через big-one slice. Загрузка нового
 зашифрованного вложения в Bitwarden выполняется владельцем через свой клиент.
 
 После утраты регистрации удалить только старую запись runner в GitHub и
@@ -75,3 +77,9 @@ ignored `ci/.state/.secrets` с правами 0600. Это JSON-bundle трёх
 commit SHA. Зелёный локальный контейнер и подготовленный YAML не доказывают
 успешный GitHub CI. Фактический run ID, SHA, network checks и backup-проверка
 фиксируются в HANDOFF после выполнения.
+
+Первый реальный run выявил недостаточный лимит 256 PID: cgroup записала
+14 отказов fork/clone, Firefox упал при navigation, OOM kills = 0.
+Тот же Firefox-сценарий отдельно с виртуальным аудиовыходом прошёл (8.9 s).
+Для runner с его собственным job worker лимит увеличен до 512; standalone
+QA сохраняет прежние 256. CPU, память, seccomp, capabilities и сеть не расширены.
