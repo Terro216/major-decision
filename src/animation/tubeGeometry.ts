@@ -36,13 +36,16 @@ export function tubeGeometry(outcome: Outcome) {
     const inward = radius === TUBE.inner ? -1 : 1;
     for (let i = 0; i <= segments; i++) {
       const center = path.getPoint(i / segments);
-      // Rolled outer lips, with the complete .70 bore continuing to the edge.
-      // The rings belong to this tested mesh, not decorative sealed caps.
+      // A flared open mouth with two rolled lips, as in the film. The bore
+      // widens at the opening; the internal minimum stays .70 throughout.
+      // Every surface belongs to this collision-tested mesh.
       const distance = Math.min(samples[i], tubeLength - samples[i]);
-      const first = (TUBE.rim - TUBE.outer) * Math.exp(-(((distance - .08) / .065) ** 2));
-      const second = .16 * Math.exp(-(((distance - .34) / .075) ** 2));
-      const lip = radius === TUBE.outer ? first + second : 0;
-      const slope = radius === TUBE.outer ? (-first * 2 * (distance - .08) / .065 ** 2 - second * 2 * (distance - .34) / .075 ** 2) * (i < segments / 2 ? 1 : -1) : 0;
+      const flare = Math.exp(-((distance / .22) ** 2));
+      const first = .04 * Math.exp(-(((distance - .045) / .035) ** 2));
+      const second = .16 * Math.exp(-(((distance - .30) / .060) ** 2));
+      const amount = radius === TUBE.outer ? .22 : .20;
+      const lip = amount * flare + (radius === TUBE.outer ? first + second : 0);
+      const slope = (-amount * flare * 2 * distance / .22 ** 2 + (radius === TUBE.outer ? -first * 2 * (distance - .045) / .035 ** 2 - second * 2 * (distance - .30) / .060 ** 2 : 0)) * (i < segments / 2 ? 1 : -1);
       for (let j = 0; j <= sides; j++) {
         const angle = j / sides * Math.PI * 2;
         const n = frames.normals[i].clone().multiplyScalar(Math.cos(angle)).addScaledVector(frames.binormals[i], Math.sin(angle));

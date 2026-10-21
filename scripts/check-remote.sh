@@ -9,7 +9,7 @@ fi
 # disposable container; only review artifacts are written back to the checkout.
 artifact_owner="$(node -e 'require("node:fs").mkdirSync(".review", { recursive: true }); console.log(process.getuid() + ":" + process.getgid())')"
 docker run --rm --init --name major-decision-shell-check \
-  --cpus=2 --memory=1536m --shm-size=256m --pids-limit=256 \
+  --cpus=2 --memory=1536m --shm-size=256m --pids-limit=512 \
   --security-opt no-new-privileges:true \
   --mount "type=bind,src=$PWD,dst=/repo,readonly" \
   --mount "type=bind,src=$PWD/.review,dst=/artifacts" \

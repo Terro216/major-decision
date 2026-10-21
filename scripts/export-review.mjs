@@ -10,7 +10,10 @@ const output = cross ? path.join(root, 'randomness') : root;
 const fps = 24;
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
 try {
-  const index = { fps, duration: 6.9, build: JSON.parse(await readFile(path.join(root, 'check-result.json'), 'utf8')).indexSha256, exporterSha256: createHash('sha256').update(await readFile(new URL(import.meta.url))).digest('hex'), outcomes: {}, slowPlayback: {} };
+  const checked = JSON.parse(await readFile(process.env.MD_BUILD_REPORT || path.join(root, 'check-result.json'), 'utf8'));
+  const html = await fetch(preview).then(response => { if (!response.ok) throw new Error(`Preview HTTP ${response.status}`); return response.text(); });
+  if (createHash('sha256').update(html).digest('hex') !== checked.indexSha256) throw new Error('Preview does not match the recorded build.');
+  const index = { fps, duration: 6.9, build: checked.indexSha256, exporterSha256: createHash('sha256').update(await readFile(new URL(import.meta.url))).digest('hex'), outcomes: {}, slowPlayback: {} };
   const runs = cross ? [{ outcome: 'no', scenario: 'left', key: 'left-no' }, { outcome: 'yes', scenario: 'right', key: 'right-yes' }] : ['yes', 'no'].map(outcome => ({ outcome, scenario: 'film', key: outcome }));
   for (const { outcome, scenario, key } of runs) {
     const directory = path.join(output, 'export', key);

@@ -21,23 +21,40 @@ export function travel(a: Vec3, b: Vec3, va: Vec3, vb: Vec3, start: number, end:
   return add(add(mul(a, 2*u3-3*u2+1), mul(b, -2*u3+3*u2)), add(mul(va, (u3-2*u2+u)*dt), mul(vb, (u3-u2)*dt)));
 }
 export const timing = {
-  yes: { release: .53, fieldStart: 1.12, fieldEnd: 3.20, approach: 4.20, entry: 4.30, exit: 4.91 },
-  no: { release: .59, fieldStart: 1.20, fieldEnd: 3.28, approach: 4.30, entry: 4.40, exit: 4.94 },
+  yes: { release: .53, fieldStart: 1.12, fieldEnd: 3.85, approach: 4.20, entry: 4.30, exit: 4.91 },
+  no: { release: .59, fieldStart: 1.20, fieldEnd: 3.95, approach: 4.30, entry: 4.40, exit: 4.94 },
 } as const;
 export const sourceBall = (outcome: Outcome): Vec3 => add(sourcePosition(outcome), [0, 0, TARGET.face + BALL_RADIUS]);
 export const fallEnd = (outcome: Outcome) => timing[outcome].release + .36;
 export const entryLead = 1.3;
 export const entrySpeed = entryLead / .10;
-// Equal endpoint speeds join the release and approach. The smooth acceleration
-// inside the field completes the visible contacts before the long inlet move.
+// The reference keeps rebounding until roughly 3.7 s. The previous single
+// ease completed the fan much too early, followed by a long free glide.
+// These approximate contact beats retime the same collision-safe corridor.
+// Distances and endpoint tangents still join the release and approach in C1.
 export function fieldSpeed(_outcome: Outcome) { return 5.5; }
+const contactBeats: Record<Outcome, readonly number[]> = {
+  yes: [1.42,1.59,1.74,2.08,2.40,2.75,3.20,3.65],
+  no: [1.51,1.68,1.83,2.18,2.50,2.85,3.30,3.75],
+};
+function fieldTrack(outcome: Outcome) {
+  const t=timing[outcome], distances=fields[outcome].distances;
+  const times=[t.fieldStart,...contactBeats[outcome],t.fieldEnd];
+  const slopes=times.slice(1).map((time,i)=>(distances[i+1]-distances[i])/(time-times[i]));
+  const velocities=times.map((_,i)=>i===0||i===times.length-1?fieldSpeed(outcome):Math.min(slopes[i-1],slopes[i]));
+  return {times,distances,velocities};
+}
+const fieldTracks={yes:fieldTrack('yes'),no:fieldTrack('no')};
 export function fieldDistanceAt(time: number, outcome: Outcome) {
-  const t=timing[outcome], speed=fieldSpeed(outcome);
-  return travel([0,0,0],[fields[outcome].length,0,0],[speed,0,0],[speed,0,0],t.fieldStart,t.fieldEnd,time)[0];
+  const {times,distances,velocities}=fieldTracks[outcome];
+  if(time<=times[0]) return 0;
+  const i=times.findIndex(t=>t>=time);
+  if(i<0) return distances.at(-1)!;
+  return travel([distances[i-1],0,0],[distances[i],0,0],[velocities[i-1],0,0],[velocities[i],0,0],times[i-1],times[i],time)[0];
 }
 export function fieldVelocityBound(outcome: Outcome) {
-  const t=timing[outcome], speed=fieldSpeed(outcome);
-  return Math.max(speed,1.5*fields[outcome].length/(t.fieldEnd-t.fieldStart)-.5*speed);
+  const {times,distances,velocities}=fieldTracks[outcome];
+  return Math.max(...velocities,...times.slice(1).map((t,i)=>3*(distances[i+1]-distances[i])/(t-times[i])-velocities[i]-velocities[i+1]));
 }
 export function exitSpeed(outcome: Outcome) { return TARGET.flight / (TARGET.hit - timing[outcome].exit); }
 export function tubeMotion(outcome: Outcome) {
@@ -101,12 +118,12 @@ const earlyShots: Record<Outcome, readonly Key[]> = {
   yes: [[.70,.494,.182,.099,0,.52,0],[.95,.462,.346,.119,-.04,.61,-.04],
     [1.20,.456,.455,.128,-.25,.78,-.20],[1.40,.472,.465,.137,-.45,.83,-.36],[1.65,.552,.594,.140,-.66,.81,-.42],[1.90,.570,.494,.137,-.85,.75,-.20],
     [2.40,.428,.82,.148,-1.4,.35,.10],[2.60,.438,.778,.151,-1.6,.30,.13],[2.90,.388,.823,.172,-1.85,.25,.12],
-    [3.20,.30,.65,.18,-1.70,.25,.08],[3.65,.376,.72,.17,-1.40,.15,.04],[4.15,.450,.485,.130,-1.45,.10,0],
+    [3.20,.30,.65,.18,-2.18,.25,.08],[3.65,.376,.72,.17,-2.09,.13,.04],[4.15,.450,.485,.130,-1.475,.10,0],
     [4.30,.50,.46,.125,-1.4,.10,0]],
   no: [[.70,.517,.153,.087,0,.49,0],[.95,.552,.282,.119,.04,.57,.04],
     [1.20,.557,.452,.128,.25,.78,.20],[1.40,.544,.461,.128,.45,.83,.36],[1.70,.528,.615,.140,.67,.81,.42],[1.95,.415,.541,.125,.85,.75,.20],
     [2.40,.622,.81,.145,1.4,.35,-.10],[2.60,.585,.769,.157,1.6,.30,-.13],[2.72,.575,.78,.16,1.80,.27,-.13],[2.90,.551,.797,.166,1.95,.25,-.12],
-    [3.20,.64,.64,.18,1.70,.25,-.08],[3.70,.648,.749,.16,1.40,.15,-.04],[4.15,.650,.51,.132,1.65,.10,0],
+    [3.20,.64,.64,.18,2.14,.25,-.08],[3.70,.648,.749,.16,2.05,.17,-.04],[4.15,.650,.51,.132,1.80,.10,0],
     [4.40,.51,.46,.125,1.4,.10,0]],
 };
 
@@ -135,7 +152,9 @@ function earlyCameraKeys(outcome: Outcome): readonly Key[] {
   const keys: Key[] = [[0,...position,...aim,24.45,0],[outcome==='yes'?.45:.49,...position,...aim,24.45,0]];
   for(const [time,x,y,diameter,azimuth,elevation,roll] of earlyShots[outcome]) {
     const forward: Vec3 = [-Math.sin(azimuth)*Math.cos(elevation),-Math.sin(elevation),-Math.cos(azimuth)*Math.cos(elevation)];
-    const fov = time === .70 ? 44 : 38;
+    // The inlet and sphere landmarks constrain the longer lens in the final
+    // fan shot. The earlier 38-degree lens pushed the coil off the side.
+    const fov = time === .70 ? 44 : time===3.20 ? 22 : time===3.65||time===3.70 ? 12 : 38;
     const shot = frameBall(ballAt(time,outcome),forward,x,y,diameter,fov,roll);
     keys.push([time,...shot.position,...shot.aim,fov,roll]);
   }

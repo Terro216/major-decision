@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import * as THREE from 'three';
 import { writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { ballAt, cameraAt, cameraUp, indicatorAt, indicatorBallsAt } from '../src/animation/timeline';
+import { ballAt, cameraAt, cameraUp, indicatorAt, indicatorBallsAt, pinContacts } from '../src/animation/timeline';
 import { add, BALL_RADIUS, cross, dot, fields, mul, PIN_HEIGHT, PIN_RADIUS, sourcePosition, sub, TARGET, targetFrame, TUBE, tubeLength, tubeParameterSpeedBound, tubePoint, unit, type Outcome, type Vec3 } from '../src/animation/mechanism';
 
 function projection(time: number, outcome: Outcome, point = ballAt(time,outcome)) {
@@ -64,6 +64,19 @@ test('film indicator: independent branch beats, closer positions and darkness at
     expect((green[0].y+59.5)/165).toBeCloseTo(.66,2);
     expect(indicatorBallsAt(5.95,outcome)).toHaveLength(0);
     expect(indicatorBallsAt(4.64,outcome)).toHaveLength(2);
+  }
+});
+
+test('film late fan: rebounds continue beside a large inlet before the entry shot', () => {
+  // Approximate observations from 01_tie_09 and 02_competition_09. These
+  // screen landmarks exposed the early stop and the coil outside the frame.
+  for (const [outcome,time,x,y] of [['yes',3.65,.745,.40],['no',3.70,.24,.38]] as const) {
+    const mouth=projection(time,outcome,tubePoint(0,outcome));
+    expect(Math.abs(mouth.x-x)).toBeLessThan(.04);
+    expect(Math.abs(mouth.y-y)).toBeLessThan(.04);
+    const last=pinContacts[outcome].at(-1)![0];
+    expect(last).toBeGreaterThan(3.5);
+    expect(last).toBeLessThan(3.85);
   }
 });
 
