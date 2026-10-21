@@ -249,9 +249,10 @@ export function createScene(canvas: HTMLCanvasElement) {
     glowingBallMaterial.color.set(outcome === 'yes' ? '#8fff4d' : '#ff3923').multiplyScalar(radiance ? 2.2 : 1);
     ballMaterial.color.set('#ffffff');
     ballMaterial.emissive.set('#ffffff');
-    // The impact leaves a luminous orange centre in the film. This is the
-    // same full-radius sphere, still tangent to the plate and depth-tested.
-    ballMaterial.emissiveIntensity = .055 + .70*smooth((t-TARGET.hit)/.10);
+    // Keep the warm orange fill through the unlit flight, then leave the
+    // luminous centre seen at impact. This remains the same full-radius,
+    // depth-tested sphere, tangent to the plate after contact.
+    ballMaterial.emissiveIntensity = .16 + .25*smooth((t-timing[path].exit)/.10) + .35*smooth((t-TARGET.hit)/.10);
     pulse.position.fromArray(p);
     pulse.color.set(outcome === 'yes' ? '#75ff48' : '#ff5130');
     pulse.intensity = colored ? 3.5 : 0;
