@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { ballAt, cameraAt, cameraUp, indicatorAt, indicatorBallsAt, pinContacts } from '../src/animation/timeline';
-import { add, BALL_RADIUS, cross, dot, fields, mul, PIN_HEIGHT, PIN_RADIUS, sourcePosition, sub, TARGET, targetFrame, TUBE, tubeLength, tubeParameterSpeedBound, tubePoint, unit, type Outcome, type Vec3 } from '../src/animation/mechanism';
+import { add, BALL_RADIUS, cross, dot, fields, mul, PIN_HEIGHT, PIN_RADIUS, sourcePosition, sub, TARGET, targetFrame, TUBE, tubeLength, tubeParameterSpeedBound, tubePoint, tubeTangent, unit, type Outcome, type Vec3 } from '../src/animation/mechanism';
 
 function projection(time: number, outcome: Outcome, point = ballAt(time,outcome)) {
   const camera=cameraAt(time,outcome), position=camera.slice(0,3) as unknown as Vec3;
@@ -82,6 +82,25 @@ test('film late fan: rebounds continue beside a large inlet before the entry sho
 
 // These coordinates are independent observations from the supplied MP4/PNGs.
 // Protect composition, not a claimed pixel match or exact recovered 3D scene.
+test('film upper mouths: the orbit reveals the real bore instead of its edge', async () => {
+  const report=[];
+  for (const [outcome,time] of [['yes',4.70],['no',4.65]] as const) {
+    const mouth=tubePoint(tubeLength,outcome), camera=cameraAt(time,outcome);
+    const towardCamera=unit(sub(camera.slice(0,3) as unknown as Vec3,mouth));
+    // The original coil frames show a broad ellipse. A frontal component
+    // above .35 protects its visible width, independent of tube transparency.
+    const facing=dot(tubeTangent(tubeLength,outcome),towardCamera);
+    expect(facing).toBeGreaterThan(.35);
+    const centre=projection(time,outcome,mouth);
+    expect(centre.x).toBeGreaterThan(.30);
+    expect(centre.x).toBeLessThan(.60);
+    expect(centre.y).toBeGreaterThan(.05);
+    expect(centre.y).toBeLessThan(.35);
+    report.push({outcome,time,facing,centre});
+  }
+  await writeFile(path.join(process.env.MD_REVIEW_DIR||'.review','outlet-framing-check.json'),JSON.stringify(report,null,2));
+});
+
 test('film framing: early ball scale, low field composition and inlet side', async () => {
   const observed: Record<Outcome, number[][]> = {
     yes: [[.95,.462,.346,.119],[1.2,.456,.455,.128],[1.65,.552,.594,.140],
