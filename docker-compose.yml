@@ -1,0 +1,35 @@
+name: major-decision
+services:
+  web:
+    build: .
+    image: major-decision:${MAJOR_DECISION_TAG:-latest}
+    container_name: major-decision
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    cpus: 0.50
+    mem_limit: 64M
+    pids_limit: 64
+    networks: [proxy]
+    expose: [8080]
+    labels:
+      caddy: decision.ilyamedve.dev
+      caddy.reverse_proxy: "{{upstreams 8080}}"
+      caddy.encode: zstd gzip
+    healthcheck:
+      test: [CMD, wget, -q, --spider, "http://127.0.0.1:8080/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+networks:
+  proxy:
+    external: true

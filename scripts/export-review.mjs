@@ -4,6 +4,7 @@ import { mkdir, writeFile, readFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
 const root = process.env.MD_REVIEW_DIR || '.review';
+const preview = process.env.MD_PREVIEW_URL || 'http://127.0.0.1:4175';
 const cross = process.argv.includes('--cross');
 const output = cross ? path.join(root, 'randomness') : root;
 const fps = 24;
@@ -14,7 +15,7 @@ try {
   for (const { outcome, scenario, key } of runs) {
     const directory = path.join(output, 'export', key);
     await mkdir(directory, { recursive: true });
-    const page = await browser.newPage({ viewport: { width: 800, height: 650 } });
+    const page = await browser.newPage({ viewport: { width: 800, height: 1000 } });
     if (!index.mediaCapabilities) {
       index.mediaCapabilities = await page.evaluate(() => {
         const video = document.createElement('video');
@@ -22,7 +23,7 @@ try {
       });
       console.log('Browser video codecs: ' + JSON.stringify(index.mediaCapabilities));
     }
-    await page.goto(`http://127.0.0.1:4175/?review=1&outcome=${outcome}&scenario=${scenario}&t=0`);
+    await page.goto(`${preview}/?review=1&outcome=${outcome}&scenario=${scenario}&t=0`);
     await page.getByRole('button', { name: /BROWSER FRAME/ }).click();
     await page.waitForFunction(() => document.querySelector('.decision-stage')?.dataset.renderer === 'webgl');
     await page.evaluate(() => document.fonts.ready);
@@ -32,12 +33,22 @@ try {
     for (let i = 0; i < count; i++) {
       const time = Math.min(i / fps, 6.9);
       // Preserve i/24 within 0.5 ps while using Chromium's range serialization.
-      await page.getByRole('slider', { name: 'Animation time' }).fill(String(Number(time.toFixed(12))));
+      await page.getByRole('slider', { name: 'Animation time' }).evaluate((slider, value) => {
+        // Use the native setter and the actual React input handler, but never
+        // scroll/focus a control between captures of the scaled machine.
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(slider, value);
+        slider.dispatchEvent(new Event('input', { bubbles: true }));
+      }, String(Number(time.toFixed(12))));
+      await page.waitForFunction(expected => Math.abs(Number(document.querySelector('.decision-stage').dataset.time) - expected) < .00051, time);
+      const bounds = await page.locator('.machine').boundingBox();
+      if (Object.keys(crop).some(k => Math.abs(bounds[k] - crop[k]) > .01)) throw new Error(`Machine bounds changed at frame ${i}`);
+      const scroll = await page.evaluate(() => [...document.querySelectorAll('.terminal-surface,.machine,.viewport')].map(el => [el.scrollLeft, el.scrollTop]));
+      if (scroll.flat().some(value => value !== 0)) throw new Error(`Scrolled machine at frame ${i}: ${JSON.stringify(scroll)}`);
       const filename = `frame-${String(i).padStart(3, '0')}.png`;
       await page.screenshot({ clip: crop, path: path.join(directory, filename) });
       const renderedTime = Number(await page.locator('.decision-stage').getAttribute('data-time'));
       if (Math.abs(renderedTime - time) > .00051) throw new Error(`Frame ${i}: requested ${time}, rendered ${renderedTime}`);
-      frames.push({ file: filename, time, displayedTime: renderedTime });
+      frames.push({ file: filename, time, displayedTime: renderedTime, bounds, scroll });
       if (i % fps === 0) console.log(`${key.toUpperCase()}: ${i + 1}/${count} timeline frames`);
     }
     index.outcomes[key] = frames;
@@ -47,10 +58,10 @@ try {
   // software screencast is diagnostic; the fixed-time export above is the
   // review source and does not make a claim about a user's GPU frame rate.
   await writeFile(path.join(output, 'export', 'index.json'), JSON.stringify(index, null, 2));
-  for (const outcome of cross ? [] : ['yes', 'no']) {
+  for (const outcome of cross || process.argv.includes('--timeline-only') ? [] : ['yes', 'no']) {
     const context = await browser.newContext({ viewport: { width: 800, height: 700 }, recordVideo: { dir: path.join(root, 'recordings'), size: { width: 800, height: 700 } } });
     const page = await context.newPage(), video = page.video();
-    await page.goto(`http://127.0.0.1:4175/?review=1&outcome=${outcome}&t=0`);
+    await page.goto(`${preview}/?review=1&outcome=${outcome}&t=0`);
     await page.getByRole('button', { name: /BROWSER FRAME/ }).click();
     await page.waitForFunction(() => document.querySelector('.decision-stage')?.dataset.renderer === 'webgl');
     for (const time of ['4.45','5.8','6.9','0']) await page.getByRole('slider', { name: 'Animation time' }).fill(time);

@@ -19,6 +19,11 @@ docker run --rm --init --name major-decision-shell-check \
   bash -c '
     set -euo pipefail
     trap '\''chown -R "$MD_ARTIFACT_OWNER" /artifacts'\'' EXIT
+    # Firefox needs an audio backend to resolve a real AudioContext.resume().
+    # A null sink stays inside this disposable container; no host device is used.
+    apt-get update -qq
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends pulseaudio >/tmp/major-decision-audio-install.log 2>&1
+    pulseaudio --start --exit-idle-time=-1 --load="module-null-sink sink_name=major_decision_qa"
     cp /repo/package.json /repo/package-lock.json /repo/tsconfig.json /repo/index.html /repo/vite.config.ts /repo/playwright.config.ts .
     cp -r /repo/src /repo/public /repo/tests .
     npm ci --no-audit --no-fund

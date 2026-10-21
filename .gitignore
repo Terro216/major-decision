@@ -9,3 +9,4 @@ __pycache__/
 *.pyc
 references/film/
 references/review/
+ci/.state/

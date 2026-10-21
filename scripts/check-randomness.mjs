@@ -19,7 +19,7 @@ try {
   page.on('response', response => {
     if (response.url().startsWith('https://www.random.org/')) responses.push({ url: response.url(), status: response.status(), cors: response.headers()['access-control-allow-origin'] });
   });
-  await page.goto('http://127.0.0.1:4175/');
+  await page.goto(process.env.MD_PREVIEW_URL || 'http://127.0.0.1:4175/');
   await page.getByLabel('Random source').selectOption('external');
   await page.getByRole('textbox').fill('Private browser smoke question');
   const start = Date.now();
@@ -61,7 +61,7 @@ try {
   await media.locator('#pause').click();
   const hashes = Object.fromEntries(['yes','no','left-no','right-yes'].map(key => {
     const name=`after-${key}.mp4`;
-    return [name, createHash('sha256').update(readFileSync(`/repo/references/review/2026-10-20-motion/${name}`)).digest('hex')];
+    return [name, createHash('sha256').update(readFileSync(`/repo/references/review/2026-10-21-release/${name}`)).digest('hex')];
   }));
   writeFileSync(`${root}/playback-check.json`, JSON.stringify({ checkedAt: new Date().toISOString(), build, seeks, quarterSpeedPlayed: true, hashes }, null, 2));
   await mediaContext.close();

@@ -1,0 +1,12 @@
+Decision Question Bold — webfont derived from PT Serif Bold
+
+Original design: Copyright (c) 2010, ParaType Ltd.
+License: SIL Open Font License 1.1; see OFL.txt in this directory.
+
+2026-10-21
+Removed an overflowing legacy format-0 kern subtable that Firefox rejected.
+Preserved every glyph, Unicode mapping, advance, GPOS and GSUB table.
+Converted to WOFF2 and renamed the derivative to Decision Question to respect
+the original Reserved Font Names. This is not an original ParaType release.
+The unchanged source TTF is retained in tools/fonts/PTSerif-Bold.ttf; the
+reproducible conversion and geometry checks are in scripts/prepare-question-font.py.

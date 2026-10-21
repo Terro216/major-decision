@@ -1,0 +1,56 @@
+name: major-decision-ci
+services:
+  egress:
+    image: major-decision-ci:20261021
+    container_name: major-decision-ci-egress
+    user: "1001:1001"
+    entrypoint: [squid, -N, -f, /etc/major-decision-squid.conf]
+    restart: unless-stopped
+    read_only: true
+    tmpfs: ["/tmp:size=32m,mode=1777"]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    cpus: 0.25
+    mem_limit: 128M
+    pids_limit: 64
+    networks: [isolated, egress]
+    logging:
+      driver: json-file
+      options: {max-size: 5m, max-file: "2"}
+  runner:
+    build: .
+    image: major-decision-ci:20261021
+    container_name: major-decision-ci-runner
+    user: "1001:1001"
+    restart: unless-stopped
+    init: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    cpus: 2
+    mem_limit: 1536M
+    shm_size: 256M
+    pids_limit: 256
+    networks: [isolated]
+    depends_on: [egress]
+    volumes:
+      - type: bind
+        source: ./.state
+        target: /state
+        bind: {create_host_path: false}
+    environment:
+      http_proxy: http://egress:3128
+      https_proxy: http://egress:3128
+      no_proxy: localhost,127.0.0.1,::1
+    logging:
+      driver: json-file
+      options: {max-size: 5m, max-file: "2"}
+networks:
+  isolated:
+    internal: true
+    driver_opts:
+      com.docker.network.bridge.gateway_mode_ipv4: isolated
+    ipam:
+      config: [{subnet: 192.0.2.0/28}]
+  egress:
+    ipam:
+      config: [{subnet: 192.0.2.16/28}]
