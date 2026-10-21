@@ -22,6 +22,14 @@ Chromium, Firefox и WebKit. GitHub workflow для того же commit:
 завершился 45/46: Firefox упал при открытии страницы. В cgroup — 14 отказов
 по PID limit, OOM kills = 0. Отдельный Firefox с тем же аудио прошёл за 8.9 s.
 Лимит только runner увеличен с 256 до 512 PID; повторный полный CI обязателен.
+Повторный полный [run 39522456776](https://github.com/Terro216/major-decision/actions/runs/39522456776)
+запущен для `03a7e2f0c2224320701d0b2fa1fc99dabb888853` после пересоздания
+runner; исходники приложения и production-образ остались прежними.
+Все **46/46 прошли за 24.4 минуты**; PID peak 277, PID denials 0, OOM kills 0.
+Однако workflow завершился ошибкой job-complete hook: в его пути отсутствовало
+обязательное расширение `.sh`. Архив GitHub с полными результатами сохранён,
+его digest и source/HTML сверены. Исправленный образ `20261021-hook` проходит
+проверку и повторный полный workflow; зелёный CI ещё не заявляется.
 
 Проверены четыре пары маршрут/ответ, повторяемая перемотка, reset и WebGL
 fallback с тем же исходом; геометрия всего пути с шагом 1 ms и оценкой
@@ -96,6 +104,9 @@ GitHub approval policy `all_external_contributors`. [CI runbook](CI.md).
 Сайт stateless: опубликованный Git → bounded build на big-one → scoped
 Compose → public smoke. Данные вопросов отсутствуют. [DEPLOYMENT](DEPLOYMENT.md)
 содержит откат первого выпуска и последующих обновлений.
+Архив точного опубликованного commit `bb1436d` сохранён в review как
+`release-source.tar.gz`; его SHA и проверка отсутствия приватной регистрации
+и film media — в `release-source.json`.
 
 CI-регистрация находится в ignored `ci/.state/.secrets`, 0600 в каталоге 0700.
 Включение в big-one slice recovery collector и равенство приватной DE-копии
@@ -105,7 +116,8 @@ CI-регистрация находится в ignored `ci/.state/.secrets`, 06
 не доказательство включения новой регистрации в старый encrypted snapshot.
 
 Родительские integration-правки и каталог `server-homepage` оставлены
-незафиксированными; parent index не изменён. Чужие изменения for-two,
+незафиксированными; staged diff родителя остался пустым. Байтовая идентичность
+файла index не утверждается: он содержит обновляемый Git stat-cache. Чужие изменения for-two,
 tick-laugh, voice_shopping_list и DE uptime сохранены. Точные узкие patches
 сохранены в ignored review рядом с release evidence.
 

@@ -1,7 +1,7 @@
 name: major-decision-ci
 services:
   egress:
-    image: major-decision-ci:20261021
+    image: major-decision-ci:20261021-hook
     container_name: major-decision-ci-egress
     user: "1001:1001"
     entrypoint: [squid, -N, -f, /etc/major-decision-squid.conf]
@@ -19,7 +19,7 @@ services:
       options: {max-size: 5m, max-file: "2"}
   runner:
     build: .
-    image: major-decision-ci:20261021
+    image: major-decision-ci:20261021-hook
     container_name: major-decision-ci-runner
     user: "1001:1001"
     restart: unless-stopped

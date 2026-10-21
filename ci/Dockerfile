@@ -10,10 +10,10 @@ RUN curl --fail --location --silent --show-error https://github.com/actions/runn
     && rm /tmp/runner.tar.gz \
     && chown -R pwuser:pwuser /runner
 COPY runner.py /usr/local/bin/major-decision-runner
-COPY job-complete.sh /usr/local/bin/major-decision-job-complete
+COPY job-complete.sh /usr/local/bin/major-decision-job-complete.sh
 COPY squid.conf /etc/major-decision-squid.conf
-RUN chmod 0755 /usr/local/bin/major-decision-runner /usr/local/bin/major-decision-job-complete
+RUN chmod 0755 /usr/local/bin/major-decision-runner /usr/local/bin/major-decision-job-complete.sh
 USER pwuser
-ENV ACTIONS_RUNNER_HOOK_JOB_COMPLETED=/usr/local/bin/major-decision-job-complete \
+ENV ACTIONS_RUNNER_HOOK_JOB_COMPLETED=/usr/local/bin/major-decision-job-complete.sh \
     MD_EXECUTION_HOST=big-one NODE_OPTIONS=--max-old-space-size=768
 ENTRYPOINT ["/usr/local/bin/major-decision-runner"]

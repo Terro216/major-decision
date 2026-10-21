@@ -40,7 +40,9 @@ GitHub [рекомендует self-hosted runners для private repositories](
 Из корня проекта:
 
 ```sh
-docker buildx build --builder major-decision-build --load -t major-decision-ci:20261021 ci
+docker buildx create --name major-decision-ci-build --driver docker-container --driver-opt memory=1536m,cpu-quota=200000,cpu-period=100000 --bootstrap
+docker buildx build --builder major-decision-ci-build --load -t major-decision-ci:20261021-hook ci
+docker buildx rm major-decision-ci-build
 mkdir -m 700 -p ci/.state
 docker compose -f ci/compose.yaml up -d --no-build --pull never egress
 ```
@@ -83,3 +85,10 @@ commit SHA. Зелёный локальный контейнер и подгот
 Тот же Firefox-сценарий отдельно с виртуальным аудиовыходом прошёл (8.9 s).
 Для runner с его собственным job worker лимит увеличен до 512; standalone
 QA сохраняет прежние 256. CPU, память, seccomp, capabilities и сеть не расширены.
+
+Второй полный run прошёл 46/46 за 24.4 min, PID peak 277, PID denials 0,
+OOM kills 0. Workflow завершился ошибкой только в завершающем hook:
+GitHub требует расширение языка в его пути. В образе `20261021-hook`
+COPY, chmod и `ACTIONS_RUNNER_HOOK_JOB_COMPLETED` используют путь
+`/usr/local/bin/major-decision-job-complete.sh`.
+Основание: [GitHub job hooks](https://docs.github.com/en/actions/how-tos/manage-runners/self-hosted-runners/run-scripts).
