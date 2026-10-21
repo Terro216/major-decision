@@ -8,13 +8,13 @@ body{margin:24px;background:#101726;color:#dce5f4;font:16px/1.5 system-ui}main{m
 </style>
 <main>
 <h1>Фильм / до / после</h1>
-<p>Проверка движения от 20 октября 2026. «До» — исходники в начале этого прохода; прежние архивы .review отсутствовали. Радиус шара, просвет, прозрачность и постановочные ключи камеры сохранены. Изменены разгон в трубе, стыки горловин и точность времени экспорта. Пользовательская приёмка ещё не состоялась.</p>
-<p><a href="MOTION_CONTINUITY_REVIEW.md">Наблюдения и границы проверки</a> · <a href="HANDOFF.md">Handoff</a> · <a href="camera-scenarios.html">Четыре сочетания маршрута и ответа</a></p>
+<p>Проход к выпуску от 21 октября 2026. «До» — сохранённая версия 5d2189c, заново собранная и экспортированная перед правками. Радиус шара, просвет, прозрачность и постановочные ключи камеры сохранены. Уточнены ободки трубы, свечение шара, индикатор и оболочка; добавлены мобильная компоновка, звук и доступность. Границы визуального сходства записаны в отчёте, пользовательское принятие не предполагается.</p>
+<p><a href="RELEASE_REVIEW.md">Наблюдения и границы проверки</a> · <a href="HANDOFF.md">Handoff</a> · <a href="camera-scenarios.html">Четыре сочетания маршрута и ответа</a></p>
 <div><button data-movie="yes" aria-pressed="true">YES · LEFT</button><button data-movie="no" aria-pressed="false">NO · RIGHT</button></div>
 <div><button id="play-movies">PLAY / RESTART</button><button id="pause-movies">PAUSE</button><button id="resume-movies">RESUME</button><label>Скорость <select id="movie-speed"><option value="1">1×</option><option value="0.25">¼×</option></select></label><label>Время <input id="movie-time" type="range" min="0" max="6.9" step="any" value="0"></label><output id="timecode">0.00 s</output></div>
 <div class="movies">
 <figure><figcaption>Фильм · без коррекции перспективы монитора</figcaption><video id="film" controls muted playsinline preload="metadata"></video></figure>
-<figure><figcaption>До · скорость выборки округлялась до 10 мс</figcaption><video id="before" controls muted playsinline preload="metadata"></video></figure>
+<figure><figcaption>До · исходная версия этого прохода</figcaption><video id="before" controls muted playsinline preload="metadata"></video></figure>
 <figure><figcaption>После · точные 24 кадра/с таймлайна</figcaption><video id="after" controls muted playsinline preload="metadata"></video></figure>
 </div>
 <p>Полный ролик из трёх колонок: <a id="triple">скачать</a>. Полная текущая последовательность: <a id="single">скачать</a>. Это детерминированный экспорт, а не измерение FPS устройства. Привязка оригинала приблизительная: YES +5.70 с, NO +6.20 с. Точки контакта между кадрами дополнительно проверены по геометрии.</p>
@@ -24,10 +24,10 @@ body{margin:24px;background:#101726;color:#dce5f4;font:16px/1.5 system-ui}main{m
 <figure><figcaption>Подход и вход</figcaption><a id="entry-link"><img id="entry" alt="Подход и вход: фильм, до, после"></a></figure>
 <figure><figcaption>Проход в спирали и выход</figcaption><a id="coil-link"><img id="coil" alt="Спираль: фильм, до, после"></a></figure>
 <figure><figcaption>Выход, крупный план, попадание</figcaption><a id="exit-link"><img id="exit" alt="Попадание: фильм, до, после"></a></figure>
-</div><p><a href="../references/review/2026-10-20-motion/opaque-diagnostics.png">Оба маршрута с непрозрачной трубой: поле, вход и выход</a>. Эти отдельные диагностические ракурсы проверяют геометрию; в полной анимации используются прежние постановочные ключи.</p><p id="error" role="alert"></p>
+</div><p><a href="../references/review/2026-10-21-release/opaque-diagnostics.png">Оба маршрута с непрозрачной трубой: поле, вход и выход</a>. Эти отдельные диагностические ракурсы проверяют геометрию; в полной анимации используются прежние постановочные ключи.</p><p id="error" role="alert"></p>
 </main>
 <script>
-const root='../references/review/2026-10-20-motion/';
+const root='../references/review/2026-10-21-release/';
 const videos=[...document.querySelectorAll('video')], slider=document.querySelector('#movie-time');
 const pause=()=>videos.forEach(v=>v.pause());
 const play=()=>Promise.all(videos.map(v=>v.play())).catch(e=>document.querySelector('#error').textContent=e.message);

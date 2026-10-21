@@ -28,14 +28,15 @@ as the visual authority. Do not replace the design with a contemporary dashboard
 - Build, preview and browser checks run on **big-one**, not DE. Verify shims.
   `scripts/check-remote.sh` uses a bounded, isolated browser container.
 - Do not add a Sites hosting dependency: this project uses the user's own
-  Docker/Caddy infrastructure. Publication is a later phase of the agreed plan.
+  Docker/Caddy infrastructure. Use the scoped release procedure in docs/DEPLOYMENT.md.
 - Update HANDOFF with actual verification, remaining work, and accepted visual
   changes at the end of a phase. Keep assumptions distinct from film evidence.
 - No automatic commits or pushes are implied by a documentation update.
 
 ## Scope
 
-The user expanded the authorized scope on 2026-10-18 to shell corrections and
-both 3D YES/NO sequences (PLAN phase 2), with reference comparisons and handoff.
-Usability/mobile/sound and deployment remain phases 3–4. No publication, commit
-or push is implied by phase completion.
+The user expanded the authorized scope on 2026-10-21 to all PLAN phases,
+including mobile, original opt-in sound, accessibility, Docker/Caddy, CI and
+release at decision.ilyamedve.dev. Preserve deterministic playback, independent
+route/answer selection and same-answer fallback. Builds and browsers stay on
+big-one. A documentation update alone does not imply a commit or deployment.

@@ -222,7 +222,7 @@ export function indicatorBallsAt(time: number, outcome: Outcome) {
   return beats[outcome].flatMap(([start, value], i, all) => {
     const end = all[i + 1]?.[0] ?? indicatorEnd - .07;
     if (time < start || time >= end + .07) return [];
-    const enter = smooth((time - start) / .09), leave = smooth((time - end) / .07);
+    const enter = smooth((time - start) / .05), leave = smooth((time - end) / .07);
     const direction = value === 'yes' ? 1 : -1;
     const x = (value === 'yes' ? 186 : 63) + direction * (22 * (1-enter)**2 + 14 * leave**2);
     return [{ key: start, outcome: value, x, y: 49 + 80 * (1 - enter + leave), tilt: direction * (12*(1-enter)-9*leave) }];

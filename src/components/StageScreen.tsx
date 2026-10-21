@@ -6,7 +6,7 @@ export type Screen = 'idle' | 'yes' | 'no';
 
 export function StageScreen({ screen }: { screen: Screen }) {
   return <div className="stage-screen" data-screen={screen}>
-    {screen === 'idle' ? <div className="splash" aria-label="Major Decision">
+    {screen === 'idle' ? <div className="splash" role="img" aria-label="Major Decision">
       <svg className="question-pattern" viewBox="0 0 1244 688" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
         <defs><g id="question-with-dot"><image href={goldQuestion} width="190" height="300"/></g></defs>
         <rect width="1244" height="688" fill="#0b1009"/>

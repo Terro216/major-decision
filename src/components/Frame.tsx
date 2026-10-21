@@ -100,3 +100,12 @@ export function AskSymbol() {
     <path d="M17 49l9 5M31 138l9 7" stroke="#e5ffff" strokeWidth="3"/>
   </svg>;
 }
+
+export function MobileOrnaments() {
+  return <svg className="mobile-ornaments" viewBox="0 0 490 140" aria-hidden="true">
+    <SmallIcon kind="hand" x={65} y={73} radius={52}/>
+    <SmallIcon kind="orbit" x={185} y={62} radius={54}/>
+    <SmallIcon kind="blocks" x={305} y={73} radius={52}/>
+    <SmallIcon kind="columns" x={425} y={62} radius={52}/>
+  </svg>;
+}

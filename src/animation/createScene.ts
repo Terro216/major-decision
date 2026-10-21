@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { SVGLoader } from 'three/addons/loaders/SVGLoader.js';
 import { Reflector } from 'three/addons/objects/Reflector.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { answerLetters, answerPaths } from '../answerPaths';
 import { pathFor, type Scenario } from './scenario';
 import { ballAt, cameraAt, cameraUp, clamp, DURATION, pinContacts, smooth, timing } from './timeline';
@@ -96,6 +97,13 @@ export function createScene(canvas: HTMLCanvasElement) {
   renderer.setClearColor(0x080f2c, 0);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.NoToneMapping;
+  // Blend the luminous ball and the actual glass in linear HDR. Clamping the
+  // sphere to an 8-bit framebuffer before both walls made it disappear. This
+  // keeps depth, wall opacity and the sphere's full physical size unchanged.
+  const radiance = renderer.extensions.has('EXT_color_buffer_float')
+    ? new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 2 }) : null;
+  const output = new OutputPass();
+  output.renderToScreen = true;
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(40, 1241 / 688, .1, 2000);
   const ambient = new THREE.AmbientLight('#d9d2e0', .55);
@@ -110,6 +118,7 @@ export function createScene(canvas: HTMLCanvasElement) {
   scene.add(world);
 
   const floor = new Reflector(new THREE.PlaneGeometry(10000, 10000), { color: 0x6779ad, textureWidth: 768, textureHeight: 512, clipBias: .003, multisample: 0 });
+  if (!radiance) floor.getRenderTarget().texture.type = THREE.UnsignedByteType;
   // One reflecting surface also carries its substrate and light pool. Keeping
   // these in one shader avoids coplanar depth stripes at grazing camera angles.
   const mirror = floor.material as THREE.ShaderMaterial;
@@ -184,7 +193,11 @@ export function createScene(canvas: HTMLCanvasElement) {
   });
   const texture = orangeTexture();
   const ballMaterial = new THREE.MeshPhongMaterial({ map: texture, emissiveMap: texture, specular: '#6a4d26', shininess: 18 });
-  const ball = new THREE.Mesh(new THREE.SphereGeometry(BALL_RADIUS, 40, 28), ballMaterial);
+  // A luminous sphere during the pulse, as in the reference. Multiplying its
+  // green emission by the orange albedo suppressed it inside the real wall.
+  // The mesh, depth test, radius and wall opacity are identical in both states.
+  const glowingBallMaterial = new THREE.MeshBasicMaterial({ color: '#82ff52' });
+  const ball = new THREE.Mesh<THREE.SphereGeometry, THREE.MeshPhongMaterial | THREE.MeshBasicMaterial>(new THREE.SphereGeometry(BALL_RADIUS, 40, 28), ballMaterial);
   world.add(ball);
   // The travelling pulse illuminates the nearby real wall. This keeps its
   // position legible through dense glass without thinning the distant skins.
@@ -226,9 +239,11 @@ export function createScene(canvas: HTMLCanvasElement) {
     ball.rotation.set(t * 2, t * 1.7, t);
     // Ball radius is constant throughout the journey, including the impact.
     const colored = t >= timing[path].entry && t < timing[path].exit;
-    ballMaterial.color.set(colored ? COLORS[outcome] : '#ffffff');
-    ballMaterial.emissive.set(colored ? COLORS[outcome] : '#ffffff');
-    ballMaterial.emissiveIntensity = colored ? (outcome==='yes'?3.2:2) : .16;
+    ball.material = colored ? glowingBallMaterial : ballMaterial;
+    glowingBallMaterial.color.set(outcome === 'yes' ? '#8fff4d' : '#ff3923').multiplyScalar(radiance ? 2.2 : 1);
+    ballMaterial.color.set('#ffffff');
+    ballMaterial.emissive.set('#ffffff');
+    ballMaterial.emissiveIntensity = .16;
     pulse.position.fromArray(p);
     pulse.color.set(outcome === 'yes' ? '#75ff48' : '#ff5130');
     pulse.intensity = colored ? 3.5 : 0;
@@ -269,12 +284,20 @@ export function createScene(canvas: HTMLCanvasElement) {
     key.target.updateMatrixWorld();
     key.intensity = 1.6 - .35 * finishMix;
     fill.intensity = 1.0 - .82 * finishMix;
+    renderer.setRenderTarget(radiance);
     renderer.render(scene, camera);
+    if (radiance) output.render(renderer, radiance, radiance, 0, false);
   }
 
   const resize = (draw = true) => {
     const rect = canvas.getBoundingClientRect();
-    renderer.setSize(Math.max(1, Math.round(rect.width)), Math.max(1, Math.round(rect.height)), false);
+    const width = Math.max(1, Math.round(rect.width)), height = Math.max(1, Math.round(rect.height));
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5, Math.sqrt(1_500_000 / (width * height))));
+    renderer.setSize(width, height, false);
+    const size = renderer.getDrawingBufferSize(new THREE.Vector2());
+    radiance?.setSize(size.x, size.y);
+    const reflectionWidth = Math.min(768, Math.max(256, Math.round(size.x * .66)));
+    floor.getRenderTarget().setSize(reflectionWidth, Math.round(reflectionWidth * 2 / 3));
     camera.aspect = 1241 / 688;
     if (draw) render(lastTime, lastOutcome, lastScenario, lastView, lastOpaque);
   };
@@ -289,6 +312,8 @@ export function createScene(canvas: HTMLCanvasElement) {
       disposed = true;
       observer.disconnect();
       floor.dispose();
+      radiance?.dispose();
+      output.dispose();
       const geometries = new Set<THREE.BufferGeometry>();
       const materials = new Set<THREE.Material>();
       scene.traverse(object => {
@@ -298,6 +323,9 @@ export function createScene(canvas: HTMLCanvasElement) {
         }
       });
       geometries.forEach(g => g.dispose());
+      // One of these is detached from the mesh at any particular frame.
+      materials.add(ballMaterial);
+      materials.add(glowingBallMaterial);
       materials.forEach(m => m.dispose());
       texture.dispose();
       renderer.dispose();

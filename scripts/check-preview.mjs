@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import assert from 'node:assert/strict';
-const base = 'http://127.0.0.1:4175';
+const base = process.env.MD_PREVIEW_URL || 'http://127.0.0.1:4175';
 const sha = data => createHash('sha256').update(data).digest('hex');
 const built = readFileSync('.review/dist/index.html');
 const response = await fetch(base + '/');
@@ -9,7 +9,7 @@ assert.equal(response.status, 200);
 const live = Buffer.from(await response.arrayBuffer());
 assert.equal(sha(live), sha(built), 'Preview must serve the checked build');
 const urls = [...live.toString().matchAll(/(?:src|href)="(\/[^"#]+)"/g)].map(match => match[1]);
-urls.push('/fonts/PTSerif-Bold.ttf');
+urls.push('/fonts/DecisionQuestion-Bold.woff2');
 const assets = [];
 for (const url of urls) {
   const result = await fetch(base + url);

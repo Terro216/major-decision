@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ['**/*.md', 'docs/**', 'references/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: major-decision-ci-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  check:
+    # The public repository must never execute fork/PR code on this runner.
+    if: github.repository == 'Terro216/major-decision' && github.ref == 'refs/heads/main' && github.actor == 'Terro216'
+    runs-on: [self-hosted, Linux, X64, big-one, major-decision]
+    timeout-minutes: 35
+    env:
+      CI: 'true'
+      NODE_OPTIONS: --max-old-space-size=768
+      MD_EXECUTION_HOST: big-one
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build and exercise all browser scenarios
+        run: bash scripts/check-ci.sh
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: major-decision-check-${{ github.sha }}
+          retention-days: 7
+          include-hidden-files: true
+          path: |
+            .review/check-result.json
+            .review/build-inputs.json
+            .review/*.log
+            .review/*-check.json
+            .review/usability/
+            .review/audio/
+            .review/test-results/
+            dist/

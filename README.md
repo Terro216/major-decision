@@ -18,7 +18,7 @@ HOROSCOPE, ROMANCE и CAREER видимы, но отключены. Вопрос
 NEW QUESTION отменяет и ожидание API; ошибка сервиса не подменяется
 локальным ответом. Источники и детали — [RANDOMNESS_REVIEW](docs/RANDOMNESS_REVIEW.md).
 
-Этап 2 ещё не принят пользователем. Мобильная компоновка, звук и дальнейшая доступность — следующий этап [плана](docs/PLAN.md). При отсутствии или потере WebGL доступен SVG-ответ с тем же выбранным исходом. Production-публикация остаётся отдельным этапом.
+Реализованы отдельная мобильная компоновка, собственный звук по кнопке SOUND, pause/skip, reduced motion и клавиатура. При отсутствии или потере WebGL доступен SVG-ответ с тем же выбранным исходом. Точный статус выпуска и проверки: [HANDOFF](docs/HANDOFF.md); оставшиеся отличия от фильма: [RELEASE_REVIEW](docs/RELEASE_REVIEW.md).
 
 ## Разработка
 
@@ -77,10 +77,10 @@ Playwright-сценарии в изолированном контейнере �
 - [Оба маршрута с каждым ответом](docs/camera-scenarios.html) и [внешняя случайность](docs/RANDOMNESS_REVIEW.md)
 - [Оригинальные референсы и контрольные суммы](references/README.md)
 
-PT Serif Bold для вопросов и кириллицы находится в `public/fonts/` с OFL-лицензией. Логотип, вопросы и массивные YES/NO — собственные векторные контуры. `node scripts/make-wordmark.mjs` воспроизводит wordmark и золотой вопрос; прежняя Alfa Slab One сохранена в `tools/fonts/` как материал первого этапа, но больше не используется генератором.
+Для вопросов и кириллицы используется Decision Question — производный WOFF2 от PT Serif Bold с OFL-лицензией и FONTLOG в `public/fonts/`; исходный шрифт сохранён в `tools/fonts/`. Логотип, вопросы и массивные YES/NO — собственные векторные контуры. `node scripts/make-wordmark.mjs` воспроизводит wordmark и золотой вопрос; прежняя Alfa Slab One сохранена в `tools/fonts/` как материал первого этапа, но больше не используется генератором.
 
 Сохранённый компактный результат находится в ignored-каталоге
-`references/review/2026-10-20-motion/`: полные видео, сравнения проблемных мест,
+`references/review/2026-10-21-release/`: полные видео, сравнения проблемных мест,
 архив исходников «до» и контрольные суммы. Просмотр —
 [фильм / до / после](docs/visual-comparison.html) и
 [четыре сочетания маршрута и ответа](docs/camera-scenarios.html).
@@ -93,17 +93,17 @@ PT Serif Bold для вопросов и кириллицы находится �
 node scripts/check-preview.mjs
 bash scripts/export-review.sh
 # Следующую Python-команду выполнять на big-one:
-python3 scripts/prepare-motion-review.py after
+python3 scripts/prepare-release-media.py after
 bash scripts/export-review.sh --cross
 # Эти две Python-команды также выполнять на big-one:
-python3 scripts/prepare-motion-review.py cross
-python3 scripts/prepare-motion-review.py comparisons
+python3 scripts/prepare-release-media.py cross
+python3 scripts/prepare-release-media.py comparisons
 bash scripts/check-review-media.sh
 bash scripts/check-randomness.sh
 ```
 
 После фактического просмотра записать его manifest, затем локально выполнить
-`python3 scripts/verify-motion-review.py --collect`. Обычный запуск без
+`python3 scripts/verify-release-review.py --collect`. Обычный запуск без
 `--collect` сверяет сохранённый результат уже без рабочей `.review`.
 Полный порядок, идентичность сборки и ограничения — HANDOFF.
 
