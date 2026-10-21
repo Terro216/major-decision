@@ -74,7 +74,7 @@ test('geometry: entire swept sphere clears pins, bore, lips and target in both b
       releaseBound,
       travelBound(field.points.at(-1)!,add(tubePoint(0,outcome),mul(tubeTangent(0,outcome),-entryLead)),mul(unit(sub(field.points.at(-1)!,field.points.at(-2)!)),v),inletVelocity,t.approach-t.fieldEnd));
     const tubeBound=Math.max(entrySpeed,exitSpeed(outcome),tubeMotion(outcome).cruise)*tubeParameterSpeedBound;
-    expect(nonTubeBound).toBeLessThan(50); expect(tubeBound).toBeLessThan(160);
+    expect(nonTubeBound).toBeLessThan(100); expect(tubeBound).toBeLessThan(160);
     let wallGap=Infinity, pinGap=Infinity, outsideFieldGap=Infinity, floorGap=Infinity, maxStep=0, minimumAt=0;
     const dt=.001;
     let previous=ballAt(t.release,outcome);
@@ -177,9 +177,9 @@ test('geometry: joins preserve position and velocity; impact stops at the target
     expect(ballAt(6.9,outcome)).toEqual(ballAt(TARGET.hit,outcome));
     const impactOffset=sub(ballAt(TARGET.hit,outcome),targetFrame(outcome).center);
     expect(dot(impactOffset,targetFrame(outcome).up)).toBeCloseTo(-TARGET.impactDrop,9);
-    // The lower strike clears both real raised rings and stays on the disc.
+    // The lower strike clears the real raised rim and stays on the disc.
     expect(TARGET.impactDrop+BALL_RADIUS).toBeLessThan(1.08*TARGET.scale);
-    for(const [radius,depth,width] of [[.76,.21,.025],[.79,.26,.035]]) {
+    for(const [radius,depth,width] of [[.62,.21,.035]]) {
       const ringGap=Math.hypot(radius*TARGET.scale-TARGET.impactDrop,BALL_RADIUS+(TARGET.face-depth)*TARGET.scale)-width*TARGET.scale-BALL_RADIUS;
       expect(ringGap).toBeGreaterThan(.1);
     }

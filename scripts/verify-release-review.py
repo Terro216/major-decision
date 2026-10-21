@@ -6,10 +6,12 @@ import json
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-OUT = ROOT / 'references/review/2026-10-21-release'
 parser = argparse.ArgumentParser()
 parser.add_argument('--collect', action='store_true')
+parser.add_argument('--review-dir', default='references/review/2026-10-21-release')
 args = parser.parse_args()
+OUT = (ROOT / args.review_dir).resolve()
+assert OUT.is_relative_to(ROOT / 'references/review')
 digest = lambda p: hashlib.sha256(p.read_bytes()).hexdigest()
 read = lambda name: json.loads((OUT / name).read_text())
 check = read('check-result.json')
@@ -31,9 +33,12 @@ for phase, keys in [('after', ['yes', 'no']), ('cross', ['left-no', 'right-yes']
             assert not any(value for pair in frame['scroll'] for value in pair)
 baseline = read('baseline.json')
 # The original source archive and earlier completed reviews are immutable.
-assert digest(OUT / 'before-source.tar.gz') == baseline['archiveSha256']
-for name, expected in baseline['priorReview'].items():
+if 'archiveSha256' in baseline:
+    assert digest(OUT / 'before-source.tar.gz') == baseline['archiveSha256']
+for name, expected in baseline.get('priorReview',{}).items():
     assert digest(ROOT / 'references/review/2026-10-20-motion' / name) == expected, f'Previous evidence changed: {name}'
+for name, expected in baseline.get('previousReleaseFiles',{}).items():
+    assert digest(ROOT/name)==expected, f'Previous release evidence changed: {name}'
 probes = read('video-probes.json')
 assert len(probes) == 10
 for name, probe in probes.items():

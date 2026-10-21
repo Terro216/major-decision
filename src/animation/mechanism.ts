@@ -11,10 +11,10 @@ export const RUN_HEIGHT = .78;
 // The lower mouth faces diagonally toward the end of the pin field. The
 // free approach turns onto that axis before entering the straight open lip.
 // This is one fixed layout; neither pins nor turns move with the camera.
-export const TUBE = { inner: .70, outer: .78, rim: .98, radius: 4.5, rise: 5.4, angle: Math.PI * 3.95, lead: 1, x: 7, y: 1.08, z: 11, yaw: 1.1 } as const;
+export const TUBE = { inner: .70, outer: .78, rim: 1.04, radius: 4.5, rise: 5.4, angle: Math.PI * 3.95, lead: 1, x: 7, y: 1.08, z: 11, yaw: 1.1 } as const;
 // Leave room behind the impact for the reference camera's pullback. With a
 // short flight that camera retreated into the outlet and looked through it.
-export const TARGET = { scale: 2, face: .20, impactDrop: .65, flight: 20.2, hit: 5.80, color: 5.93 } as const;
+export const TARGET = { scale: 2, face: .20, impactDrop: .25, flight: 20.2, hit: 5.80, color: 5.93 } as const;
 export const add = (a: Vec3, b: Vec3): Vec3 => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
 export const sub = (a: Vec3, b: Vec3): Vec3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 export const mul = (a: Vec3, n: number): Vec3 => [a[0] * n, a[1] * n, a[2] * n];
@@ -84,8 +84,10 @@ export function targetFrame(outcome: Outcome) {
 }
 
 const hitXs: Record<Outcome, readonly number[]> = {
-  yes: [-1.0, 1.0, -1.3, .9, -1.5, 1.2, -1.0, 1.4],
-  no: [1.0, -1.1, 1.3, -.9, 1.5, -1.2, 1.0, -1.4],
+  // The last two contacts leave the side of the fan, rather than ending
+  // among the neutral rows. The inlet remains fixed in the same world.
+  yes: [-1.0, 1.0, -1.3, .9, -1.5, 1.2, -3.0, -5.3],
+  no: [1.0, -1.1, 1.3, -.9, 1.5, -1.2, 3.0, 5.3],
 };
 export type Pin = { position: Vec3; contact?: number; color?: Outcome };
 function makeField(outcome: Outcome) {
@@ -107,7 +109,9 @@ function makeField(outcome: Outcome) {
   for (let row = 0; row < 8; row++) {
     const count = row + 2;
     for (let col = 0; col < count; col++) {
-      const p: Vec3 = add([(col - (count - 1) / 2) * 1.55, RUN_HEIGHT, -3.4 + row * 1.25],offset);
+      // The surrounding fan ends before the final contact. The previous
+      // longer rows continued beside the ball all the way toward the mouth.
+      const p: Vec3 = add([(col - (count - 1) / 2) * 1.55, RUN_HEIGHT, -3.4 + row * .95],offset);
       if (points.slice(1).some((b, i) => segmentDistance(p, points[i], b) < BALL_RADIUS + PIN_RADIUS + .12)) continue;
       if (pins.some(pin => Math.hypot(pin.position[0] - p[0], pin.position[2] - p[2]) < .65)) continue;
       pins.push({ position: [p[0], 0, p[2]] });

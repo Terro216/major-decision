@@ -8,16 +8,18 @@ import { ballAt, cameraAt, cameraUp, clamp, DURATION, pinContacts, smooth, timin
 import { add, BALL_RADIUS, fields, mix, mul, PIN_HEIGHT, PIN_RADIUS, side, sourcePosition, TARGET, TUBE, targetFrame, tubePoint, tubeTangent, type Outcome } from './mechanism';
 import { tubeGeometry, wallSorter } from './tubeGeometry';
 import { answerSurface, pinSurface, starSurface, tubeSurface } from './surfaces';
+import { backdropGLSL, createBackdrop } from './backdrop';
 export type ReviewView = 'film' | 'top' | 'side' | 'mouth';
 const COLORS = { yes: '#37bc25', no: '#dc2814', purple: '#b660d0', cyan: '#4bd4fb' };
 
-function createStar() {
+function createStar(violetCentre = true) {
   const group = new THREE.Group();
-  const material = starSurface();
+  const material = starSurface(violetCentre);
+  const bevel = new THREE.MeshPhongMaterial({color: '#763d8b',emissive:'#763d8b',emissiveIntensity:.06,specular:'#747494',shininess:45});
   const triangle = new THREE.Shape().moveTo(-.51, 1.68).lineTo(.51, 1.68).lineTo(0, 2.91).closePath();
   const geometry = new THREE.ExtrudeGeometry(triangle, { depth: .10, bevelEnabled: true, bevelThickness: .06, bevelSize: .065, bevelSegments: 2 });
   for (let i = 0; i < 8; i++) {
-    const ray = new THREE.Mesh(geometry, material);
+    const ray = new THREE.Mesh(geometry, [material,bevel]);
     ray.rotation.z = i * Math.PI / 4;
     group.add(ray);
   }
@@ -28,10 +30,10 @@ function createStar() {
   disc.rotateX(Math.PI/2);
   const plate = new THREE.Mesh(disc, material);
   group.add(plate);
-  const ring = new THREE.Mesh(new THREE.TorusGeometry(.76, .025, 8, 64), material);
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(.62, .035, 12, 64), material);
   ring.position.z = .21;
   group.add(ring);
-  return { group, material };
+  return { group, material, bevel };
 }
 
 function createAnswer(outcome: Outcome) {
@@ -105,13 +107,15 @@ export function createScene(canvas: HTMLCanvasElement) {
   const output = new OutputPass();
   output.renderToScreen = true;
   const scene = new THREE.Scene();
+  const backdrop = createBackdrop();
+  scene.add(backdrop.mesh);
   const camera = new THREE.PerspectiveCamera(40, 1241 / 688, .1, 2000);
-  const ambient = new THREE.AmbientLight('#d9d2e0', .55);
-  const key = new THREE.DirectionalLight('#fff1e1', 1.6);
-  key.position.set(-5, 10, 12);
+  const ambient = new THREE.AmbientLight('#a59be0', .14);
+  const key = new THREE.DirectionalLight('#fff0ef', 2.5);
+  key.position.set(-5, 18, -6);
   const fill = new THREE.DirectionalLight('#5670ff', 1.0);
   fill.position.set(9, 3, -10);
-  const finalLight = new THREE.PointLight('#fff1e6', 80, 40, 2);
+  const finalLight = new THREE.PointLight('#ffffff', 80, 40, 2);
   finalLight.position.set(0, 1, 6);
   scene.add(ambient, key, fill, finalLight);
   const world = new THREE.Group();
@@ -124,15 +128,17 @@ export function createScene(canvas: HTMLCanvasElement) {
   const mirror = floor.material as THREE.ShaderMaterial;
   mirror.uniforms.glow = { value: new THREE.Vector2(-1,-5) };
   mirror.uniforms.finish = { value: 0 };
+  mirror.uniforms.reveal = backdrop.material.uniforms.reveal;
+  mirror.uniforms.resolution = { value: new THREE.Vector2(1,1) };
   mirror.vertexShader = mirror.vertexShader.replace('varying vec4 vUv;', 'varying vec4 vUv; varying vec3 floorView; varying vec3 floorWorld;').replace('vUv = textureMatrix', 'floorView = (modelViewMatrix * vec4(position,1.)).xyz; floorWorld = (modelMatrix * vec4(position,1.)).xyz; vUv = textureMatrix');
-  mirror.fragmentShader = mirror.fragmentShader.replace('varying vec4 vUv;', 'varying vec4 vUv; varying vec3 floorView; varying vec3 floorWorld; uniform vec2 glow; uniform float finish;').replace('gl_FragColor = vec4( blendOverlay( base.rgb, color ), 1.0 );', `
+  mirror.fragmentShader = mirror.fragmentShader.replace('varying vec4 vUv;', `varying vec4 vUv; varying vec3 floorView; varying vec3 floorWorld; uniform vec2 glow; uniform vec2 resolution; uniform float finish; uniform float reveal; ${backdropGLSL}`).replace('gl_FragColor = vec4( blendOverlay( base.rgb, color ), 1.0 );', `
     vec2 delta = floorWorld.xz - glow;
-    float pool = exp(-dot(delta,delta)/10.);
+    float pool = exp(-dot(delta,delta)/22.);
     float wash = .5+.5*sin(floorWorld.x*.13+floorWorld.z*.09);
-    vec3 substrate = vec3(.055,.050,.48)+wash*vec3(.014,.008,.055)+pool*vec3(.88,.48,.78);
+    vec3 substrate = vec3(.035,.027,.46)+wash*vec3(.014,.008,.055)+pool*vec3(.67,.29,.79);
     vec3 radiance = mix(substrate,blendOverlay(base.rgb,color),.50);
-    vec3 horizon = mix(vec3(.0024,.004,.022),vec3(.005,.010,.070),finish);
-    gl_FragColor = vec4(mix(horizon,radiance,exp(-length(floorView)/160.)),1.);
+    vec3 horizon = backdrop(gl_FragCoord.xy/resolution,finish,reveal);
+    gl_FragColor = vec4(mix(horizon,radiance,exp(-length(floorView)/mix(160.,10.,finish))),1.);
   `);
   floor.rotation.x = -Math.PI / 2;
   world.add(floor);
@@ -140,9 +146,12 @@ export function createScene(canvas: HTMLCanvasElement) {
   pool.position.set(-1, 3, -5);
   world.add(pool);
 
-  const source = createStar();
+  const source = createStar(false);
+  source.material.emissiveIntensity=.70;
   source.group.position.fromArray(sourcePosition('yes'));
   world.add(source.group);
+  const targetLamp = new THREE.SpotLight('#ffffff',140,40,.80,.8,2);
+  world.add(targetLamp,targetLamp.target);
 
   const pinGeometry = new THREE.LatheGeometry([[0,0],[.115,0],[PIN_RADIUS,.03],[PIN_RADIUS,PIN_HEIGHT-.035],[.11,PIN_HEIGHT],[0,PIN_HEIGHT]].map(([r,y])=>new THREE.Vector2(r,y-PIN_HEIGHT/2)),24);
   // Bands sit on, never outside, the shared collision radius.
@@ -176,9 +185,6 @@ export function createScene(canvas: HTMLCanvasElement) {
     target.group.scale.setScalar(TARGET.scale);
     targetMount.add(target.group);
     group.add(targetMount);
-    const bullseye = new THREE.Mesh(new THREE.TorusGeometry(.79, .035, 12, 64), new THREE.MeshPhongMaterial({ color: '#ae78cc', specular: '#ae88cb', shininess: 35 }));
-    bullseye.position.z = .26;
-    target.group.add(bullseye);
     // The final camera rises, revealing the answer above the same stationary
     // target. Neither the ball nor the target is swapped, scaled or teleported.
     const answers = (['yes', 'no'] as const).map(result => {
@@ -189,7 +195,7 @@ export function createScene(canvas: HTMLCanvasElement) {
       return { result, mesh };
     });
     world.add(group);
-    return { outcome, group, pins, tube, material, target, targetMount, answers, bullseye };
+    return { outcome, group, pins, tube, material, target, targetMount, answers };
   });
   const texture = orangeTexture();
   const ballMaterial = new THREE.MeshPhongMaterial({ map: texture, emissiveMap: texture, specular: '#6a4d26', shininess: 18 });
@@ -233,7 +239,7 @@ export function createScene(canvas: HTMLCanvasElement) {
     }
     camera.updateProjectionMatrix();
     source.group.position.fromArray(sourcePosition(path));
-    source.group.rotation.z = -.035 * smooth(t / .5);
+    source.group.rotation.z = -2.6 * (t - .4);
     ball.position.fromArray(p);
     ball.visible = t >= timing[path].release;
     ball.rotation.set(t * 2, t * 1.7, t);
@@ -243,7 +249,9 @@ export function createScene(canvas: HTMLCanvasElement) {
     glowingBallMaterial.color.set(outcome === 'yes' ? '#8fff4d' : '#ff3923').multiplyScalar(radiance ? 2.2 : 1);
     ballMaterial.color.set('#ffffff');
     ballMaterial.emissive.set('#ffffff');
-    ballMaterial.emissiveIntensity = .16;
+    // The impact leaves a luminous orange centre in the film. This is the
+    // same full-radius sphere, still tangent to the plate and depth-tested.
+    ballMaterial.emissiveIntensity = .055 + .70*smooth((t-TARGET.hit)/.10);
     pulse.position.fromArray(p);
     pulse.color.set(outcome === 'yes' ? '#75ff48' : '#ff5130');
     pulse.intensity = colored ? 3.5 : 0;
@@ -251,9 +259,9 @@ export function createScene(canvas: HTMLCanvasElement) {
       // The route and answer are fixed for the whole run, never frame masks.
       branch.group.visible = branch.outcome === path;
       for (const answer of branch.answers) answer.mesh.visible = answer.result === outcome;
-      branch.material.color.set(colored ? COLORS[outcome] : '#b861cd');
-      branch.material.emissive.set(colored ? COLORS[outcome] : '#2a0d36');
-      branch.material.emissiveIntensity = colored ? .10 : 1;
+      branch.material.color.set(colored ? COLORS[outcome] : '#c26bd3');
+      branch.material.emissive.set(colored ? COLORS[outcome] : '#07010e');
+      branch.material.emissiveIntensity = colored ? .012 : 1;
       // The film's colored pulse still reveals the travelling ball. Keep the
       // same glass opacity through the pulse; geometry also passes opaque review.
       branch.material.opacity = opaque ? 1 : .70;
@@ -261,9 +269,10 @@ export function createScene(canvas: HTMLCanvasElement) {
       branch.target.material.color.set(t >= TARGET.color ? COLORS[outcome] : COLORS.purple);
       const flash=Math.exp(-(((t-5.865)/.025)**2));
       branch.target.material.emissive.copy(branch.target.material.color).lerp(new THREE.Color('#4768ff'),flash);
-      branch.target.material.emissiveIntensity=.18+.55*flash;
-      branch.bullseye.material.color.set(t >= TARGET.color ? COLORS[outcome] : '#ae78cc');
-      branch.target.group.rotation.z = side(path) * (.10 - .63 * smooth((t - 5.50) / .65));
+      branch.target.material.emissiveIntensity=.025+.55*flash;
+      branch.target.bevel.color.copy(branch.target.material.color).multiplyScalar(.6);
+      branch.target.bevel.emissive.copy(branch.target.bevel.color);
+      branch.target.group.rotation.z = -side(path) * 2.3 * (t - 5.95);
       for (const pin of branch.pins) { pin.material.color.set(COLORS.cyan); pin.material.emissive.set('#09364f'); }
       for (const [hit, index, color] of pinContacts[branch.outcome]) if (t >= hit) {
         branch.pins[index].material.color.set(COLORS[color]);
@@ -276,14 +285,24 @@ export function createScene(canvas: HTMLCanvasElement) {
     mirror.uniforms.glow.value.set(pool.position.x, pool.position.z);
     const finishMix = smooth((t - 5.5) / .5);
     mirror.uniforms.finish.value = finishMix;
+    backdrop.material.uniforms.finish.value = finishMix;
+    backdrop.material.uniforms.reveal.value = smooth((t - 6.15) / .6);
     const rise = 12.5 * smooth((t - 6.03) / .73);
-    finalLight.position.fromArray(add(add(f.center, mul(f.up, rise + 1)), mul(f.normal, 7)));
-    finalLight.intensity = 24 * finishMix;
-    key.position.fromArray(mix([-5, 10, camera.position.z + 4], add(add(f.center, mul(f.up, rise + 4)), add(mul(f.normal, 10), mul(f.right, -4))), finishMix));
+    // A close lamp above the plate gives the reference's bright upper rays
+    // and shaded lower rays. It follows the answer reveal, not camera yaw.
+    const reveal = backdrop.material.uniforms.reveal.value;
+    finalLight.position.fromArray(add(add(f.center, mul(f.up, rise + 5 - 2*reveal)), mul(f.normal, 3 + 7*reveal)));
+    finalLight.intensity = 360 * reveal * finishMix;
+    targetLamp.position.fromArray(add(add(f.center,mul(f.up,3)),mul(f.normal,5)));
+    targetLamp.target.position.fromArray(add(f.center,mul(f.up,3)));
+    targetLamp.target.updateMatrixWorld();
+    targetLamp.intensity=140*finishMix*(1-reveal);
+    ambient.intensity = .14 - .105 * finishMix;
+    key.position.fromArray(mix([-5, 18, -6], add(add(f.center, mul(f.up, rise + 4)), add(mul(f.normal, 10), mul(f.right, -4))), finishMix));
     key.target.position.fromArray(mix([0,0,0], add(f.center, mul(f.up, rise)), finishMix));
     key.target.updateMatrixWorld();
-    key.intensity = 1.6 - .35 * finishMix;
-    fill.intensity = 1.0 - .82 * finishMix;
+    key.intensity = 2.5 - 2.4 * finishMix;
+    fill.intensity = 1.0 - .94 * finishMix;
     renderer.setRenderTarget(radiance);
     renderer.render(scene, camera);
     if (radiance) output.render(renderer, radiance, radiance, 0, false);
@@ -296,6 +315,7 @@ export function createScene(canvas: HTMLCanvasElement) {
     renderer.setSize(width, height, false);
     const size = renderer.getDrawingBufferSize(new THREE.Vector2());
     radiance?.setSize(size.x, size.y);
+    mirror.uniforms.resolution.value.copy(size);
     const reflectionWidth = Math.min(768, Math.max(256, Math.round(size.x * .66)));
     floor.getRenderTarget().setSize(reflectionWidth, Math.round(reflectionWidth * 2 / 3));
     camera.aspect = 1241 / 688;

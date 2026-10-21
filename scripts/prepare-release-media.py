@@ -11,10 +11,14 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 WORK = ROOT / '.review'
-OUT = ROOT / 'references/review/2026-10-21-release'
 parser = argparse.ArgumentParser()
 parser.add_argument('phase', choices=['before', 'after', 'cross', 'comparisons'])
-phase = parser.parse_args().phase
+parser.add_argument('--review-dir', default='references/review/2026-10-21-release')
+parser.add_argument('--baseline-dir', help='Use a previous review after-video as the before-video.')
+args = parser.parse_args()
+phase = args.phase
+OUT = (ROOT / args.review_dir).resolve()
+assert OUT.is_relative_to(ROOT / 'references/review'), 'Review media stays in ignored references/review.'
 if socket.gethostname() != 'big-one':
     raise SystemExit('Run media preparation on big-one.')
 spec = importlib.util.spec_from_file_location('media', ROOT / 'scripts/prepare-motion-review.py')
@@ -39,6 +43,15 @@ if phase in ['before', 'after', 'cross']:
         media.sheets(movie, f'{prefix}-{key}')
     manifest.write_text(json.dumps(index, indent=2) + '\n')
 else:
+    if args.baseline_dir:
+        baseline = (ROOT / args.baseline_dir).resolve()
+        assert baseline != OUT and baseline.is_relative_to(ROOT / 'references/review')
+        for branch in ['yes','no']:
+            destination=OUT/f'before-{branch}.mp4'
+            if destination.exists():
+                assert destination.read_bytes()==(baseline/f'after-{branch}.mp4').read_bytes()
+            else:
+                shutil.copy2(baseline/f'after-{branch}.mp4',destination)
     for branch, clip, start, crop in [('yes','06m36s-06m50s.mp4',5.7,'1630:920:145:160'),('no','08m35s-08m50s.mp4',6.2,'1623:915:154:163')]:
         media.run(['-ss',str(start),'-i',str(ROOT/'references/film'/clip),'-t','7.46','-vf',f'crop={crop},scale=1240:700,setsar=1',*media.ENCODE,OUT/f'film-{branch}.mp4'])
         media.compare(branch)
@@ -52,6 +65,10 @@ else:
         if (WORK/name).exists(): shutil.copy2(WORK/name,OUT/name)
     for name in ['usability','audio']:
         shutil.copytree(WORK/name,OUT/name,dirs_exist_ok=True)
+    for name in ['layout-framing-check.json','early-framing-check.json','visual-regression-check.json']:
+        if (WORK/name).exists(): shutil.copy2(WORK/name,OUT/name)
+    for name in ['build','check']:
+        shutil.copy2(WORK/f'{name}.log',OUT/f'{name}.txt')
     probes={}
     for movie in sorted(OUT.glob('*.mp4')):
         probe=json.loads(subprocess.check_output(['ffprobe','-v','error','-show_entries','stream=codec_name,codec_type,width,height,duration,nb_frames:format=duration','-of','json',str(movie)],text=True))
