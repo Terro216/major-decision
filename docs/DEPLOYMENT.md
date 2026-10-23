@@ -51,7 +51,8 @@ bash scripts/check-remote.sh
 Перед публичным переключением запустить этот же образ как временный
 `major-decision-candidate` на `127.0.0.1:4176:8080`, без Caddy labels,
 с теми же ограничениями контейнера. `scripts/smoke-production.mjs` проверяет
-настоящий nginx, недоступность приватных файлов, все четыре пары маршрут/ответ,
+настоящий nginx, недоступность приватных файлов, все восемь сочетаний
+Movie/Freestyle × левый/правый маршрут × YES/NO,
 кириллицу, WebGL, звук, reset и отсутствие вопроса в запросах/storage.
 Ему нужны URL, каталог отчёта и актуальный `check-result.json`.
 В выпуске 23 октября клиент smoke использовал 4 CPU / 1536 MiB / 512 PID:
@@ -85,11 +86,14 @@ SSH shim его нужно передать в удалённое окружен
 
 ## Откат и восстановление
 
-Текущий выпуск визуальной версии `3ac676a`: `major-decision:release-perceptual-20261023`.
-Прежний рабочий `bee1d41` сохранён как `major-decision:rollback-perceptual-20261023`.
+Текущий выпуск Movie / Freestyle, ревизия `67e6e63`:
+`major-decision:release-modes-20261023`. `latest` указывает на тот же image.
+Прежняя production-версия `3ac676a` сохранена как
+`major-decision:rollback-modes-20261023`.
 Для отката на big-one присвоить этому сохранённому образу `major-decision:latest`,
 затем выполнить адресный `compose up` для `web` и публичный smoke. Точные
-image/source/HTML hashes и результаты текущего выпуска — в верхнем разделе HANDOFF.
+image/source/HTML hashes и результаты текущего выпуска — в HANDOFF.
+Более старый `bee1d41` также сохранён под `major-decision:rollback-perceptual-20261023`.
 
 При обновлении выбрать прежний сохранённый image tag и повторить адресный
 `compose up` выше. При первом выпуске остановить и удалить только сервис

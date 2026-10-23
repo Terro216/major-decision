@@ -62,7 +62,9 @@ ROUTE выбирает LEFT / RIGHT независимо от ответа; FILM
 Ползунок использует длительность выбранного пути; без `t` открывается финал.
 Вне review параметры режима, seed, маршрута и ответа из URL игнорируются.
 Размеры, ось трубы, контакты и мишень общие для рендера и расчётов; радиус шара
-постоянный. История прежних пересечений — в [MOTION_REVIEW](docs/MOTION_REVIEW.md); текущая проверка входа, спирали и переходов — в [MOTION_CONTINUITY_REVIEW](docs/MOTION_CONTINUITY_REVIEW.md).
+постоянный. История прежних пересечений — в [MOTION_REVIEW](docs/MOTION_REVIEW.md),
+проверка предыдущего прохода — в [MOTION_CONTINUITY_REVIEW](docs/MOTION_CONTINUITY_REVIEW.md),
+текущие изменения — в [MODES_REVIEW](docs/MODES_REVIEW.md).
 
 Проверочный preview использует порт 4175 на big-one; актуальное состояние
 и команды записаны в [HANDOFF](docs/HANDOFF.md).
@@ -83,7 +85,8 @@ Playwright-сценарии в изолированном контейнере �
 - [Этапы и критерии готовности](docs/PLAN.md)
 - [Текущее состояние и передача контекста](docs/HANDOFF.md)
 - [Готовый промпт для нового чата](docs/NEXT_CHAT_PROMPT.md)
-- [Визуальные расхождения](docs/VISUAL_REVIEW.md) и [фильм / до / после с общей перемоткой](docs/visual-comparison.html)
+- [Movie / Freestyle: изменения и проверка](docs/MODES_REVIEW.md), [корпус до/после и полные последовательности](docs/modes-comparison.html)
+- [Исторические визуальные расхождения](docs/VISUAL_REVIEW.md) и [фильм / до / после с общей перемоткой](docs/visual-comparison.html)
 - [Доводка камеры, мишени и индикатора](docs/FRAMING_REVIEW.md)
 - [Материалы, свет и объёмные буквы](docs/MATERIAL_REVIEW.md)
 - [Ранние ракурсы и веер штырей](docs/EARLY_CAMERA_REVIEW.md)

@@ -1,6 +1,28 @@
 # CI на big-one
 
-Текущий полный [CI 40003483461](https://github.com/Terro216/major-decision/actions/runs/40003483461)
+## Movie / Freestyle
+
+Актуальный [CI 40026615698](https://github.com/Terro216/major-decision/actions/runs/40026615698)
+для `67e6e637b506c9bbf12063624dec4fb8425c3238` прошёл **71/71 за 37.8 min**.
+Все шаги, upload и cleanup hook завершились успешно 23 октября 2026 UTC.
+Source fingerprint — `3edc0d858f9a90e8716179faa5e2efa8c68d97215b480f78787998fef2fa6061`,
+Все 65 входных файлов сверены на DE и big-one. Digest/CRC артефакта проверены;
+все 11 app-файлов побайтно совпали с финальным Docker-образом. Артефакт
+`12535191398`, 3 090 050 bytes, SHA-256
+`1d3b8f90265d3ce1430fbf2983c14f3da9e1a06fe2d4895df4eed8289570396a`.
+HTML: `d10f13e49c48af72916729d0cdab4a69ef302990b84f4ba83ca7b0f805ff99ba`.
+Материалы — `references/review/2026-10-23-modes/ci/`; фактический статус
+публикации и публичных проверок — [HANDOFF](HANDOFF.md).
+
+Предыдущие запуски этого прохода остановлены намеренно и не считаются полным
+успехом: `40022049540` — перед исправлением начального ракурса Freestyle;
+`40022547067` — после обнаружения устаревшего ожидания клавиатурного обхода.
+Во втором запуске успели пройти 58 сценариев. Новый тест проверяет фокус
+Movie → Freestyle, переключение пробелом и затем Browser Frame.
+
+## Исторический выпуск 56a
+
+Полный [CI 40003483461](https://github.com/Terro216/major-decision/actions/runs/40003483461)
 для `9f3843b09f3107305616cdacc90f3044b8a048e4` прошёл **57/57 за 47.0 min**
 23 октября 2026. Все шаги, upload и cleanup hook успешны. Source:
 `6cb1073a9c43405762595fc1c0de03846f1a7e178f81e7a59e811a6fb8463a77`.
@@ -16,7 +38,7 @@ r4 ограничены тремя тестовыми файлами. Артеф
 ожидания полного playback в shell/randomness ограничены 30 s, обычные
 assertions остаются 12 s. Адресные повторы прошли 6/6 и 12/12, затем весь
 актуальный CI — 57/57. Runtime, реальные часы, все проверки и ресурсы
-сохранены. Подробная диагностика неуспешных попыток — в [HANDOFF](HANDOFF.md).
+сохранены. Подробная диагностика неуспешных попыток — в [архиве HANDOFF](HANDOFF_HISTORY.md).
 
 После последнего job `_work` пуст, runner running / 0 restarts,
 PID peak 279, PID denials 0, OOM/OOM kills 0. Memory max events 620
@@ -30,6 +52,8 @@ PID peak 279, PID denials 0, OOM/OOM kills 0. Memory max events 620
 проверены; девять статических файлов совпали с production. Runner online/idle,
 `_work` пуст, PID peak 279, denials 0, OOM kills 0. Итоговые доказательства —
 `references/review/2026-10-21-fidelity/`; результаты 46/46 ниже исторические.
+
+## Устройство runner и workflow
 
 Workflow `.github/workflows/ci.yml` запускает build и весь Playwright-набор
 на runner `major-decision-big-one` только для `main` и действий владельца
