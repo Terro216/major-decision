@@ -3,6 +3,10 @@ import { writeFile, mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { webglCapture } from './webglCapture';
 
+// Network/reset assertions retain the default 12 s deadline. Completing a
+// full real-time WebGL run also includes software rendering on two CPUs.
+const completionTimeout = 30_000;
+
 async function draws(page: Page, route: number, answer: number, index = .99) {
   await page.addInitScript(({ route, answer, index }) => {
     const original = crypto.getRandomValues.bind(crypto);
@@ -123,7 +127,7 @@ test('external pool uses Math.random selection once, keeps questions private, an
   release();
   // Include cold shader compilation after the external response. Playback
   // duration itself is checked by the animation and virtual-clock tests.
-  await expect(page.getByRole('status')).toHaveText('YES', { timeout: 20_000 });
+  await expect(page.getByRole('status')).toHaveText('YES', { timeout: completionTimeout });
   expect(await page.evaluate(() => (window as any).draws)).toEqual({ route: 1, answer: 0 });
   expect(requests).toHaveLength(2);
   expect(requests.every(r => !r.referer && !r.cookie && !r.body && !r.url.includes('private'))).toBe(true);
@@ -150,7 +154,7 @@ test('reset aborts pending external work and late completion cannot overwrite a 
   await page.getByRole('textbox').fill('New question');
   await page.getByRole('button', { name: 'Ask the question' }).click();
   await pending!();
-  await expect(page.getByRole('status')).toHaveText('NO');
+  await expect(page.getByRole('status')).toHaveText('NO', { timeout: completionTimeout });
   await expect(page.getByRole('alert')).toHaveCount(0);
 });
 
@@ -173,7 +177,7 @@ test('invalid responses and exhausted quota never silently substitute local rand
   }
   response = Array(16).fill('0').join('\n');
   await page.getByRole('button', { name: 'Ask the question' }).click();
-  await expect(page.getByRole('status')).toHaveText('NO');
+  await expect(page.getByRole('status')).toHaveText('NO', { timeout: completionTimeout });
   expect(await page.evaluate(() => (window as any).draws.answer)).toBe(0);
   await page.unroute('https://www.random.org/**');
   await page.route('https://www.random.org/**', route => { calls++; return route.fulfill({ body: '-1', contentType: 'text/plain' }); });
