@@ -56,17 +56,20 @@ test('freestyle: both routes retain the same seed on reverse seek and join witho
   }
 });
 
-test('freestyle: moving ball stays in the camera throughout pins, guide, coil and flight', () => {
-  for (const scenario of ['left', 'right'] as const) for (const seed of [0, 1, 2, 60]) {
-    const run = createFreestyle(seed, scenario);
-    for (let time = run.events.fieldStart; time < run.events.hit; time += .025) {
-      const c = run.cameraAt(time), camera = new THREE.PerspectiveCamera(c[6], 1241 / 688, .1, 2000);
+test('freestyle: moving ball stays in the camera from release through pins, guide, coil and flight', () => {
+  for (const scenario of ['left', 'right'] as const) for (let seed=0;seed<100;seed++) {
+    const run = createFreestyle(seed, scenario), camera = new THREE.PerspectiveCamera(45, 1241 / 688, .1, 2000);
+    let maximum=0, worstTime=0, nearest=Infinity, farthest=-Infinity;
+    for (let time = run.events.release; time < run.events.hit; time += .025) {
+      const c = run.cameraAt(time); camera.fov=c[6];camera.updateProjectionMatrix();
       camera.position.fromArray(c); camera.up.fromArray(cameraUp(c)); camera.lookAt(c[3], c[4], c[5]); camera.updateMatrixWorld();
       const p = new THREE.Vector3(...run.ballAt(time)).project(camera);
-      expect(Math.abs(p.x), `${scenario} seed ${seed} at ${time}`).toBeLessThan(.95);
-      expect(Math.abs(p.y), `${scenario} seed ${seed} at ${time}`).toBeLessThan(.95);
-      expect(p.z).toBeGreaterThan(-1); expect(p.z).toBeLessThan(1);
+      const extent=Math.max(Math.abs(p.x),Math.abs(p.y));
+      if(extent>maximum){maximum=extent;worstTime=time;}
+      nearest=Math.min(nearest,p.z);farthest=Math.max(farthest,p.z);
     }
+    expect(maximum,`${scenario} seed ${seed} at ${worstTime}`).toBeLessThan(.95);
+    expect(nearest).toBeGreaterThan(-1);expect(farthest).toBeLessThan(1);
   }
 });
 
