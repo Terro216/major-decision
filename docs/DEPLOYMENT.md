@@ -54,6 +54,9 @@ bash scripts/check-remote.sh
 настоящий nginx, недоступность приватных файлов, все четыре пары маршрут/ответ,
 кириллицу, WebGL, звук, reset и отсутствие вопроса в запросах/storage.
 Ему нужны URL, каталог отчёта и актуальный `check-result.json`.
+В выпуске 23 октября клиент smoke использовал 4 CPU / 1536 MiB / 512 PID:
+2 CPU не хватило для screenshot в пределах 30 s. Ограничения nginx не
+менялись; основной QA и CI используют прежние 2 CPU.
 
 ## Адресное переключение
 
@@ -82,8 +85,8 @@ SSH shim его нужно передать в удалённое окружен
 
 ## Откат и восстановление
 
-Текущий выпуск визуальной версии `bee1d41`: `major-decision:release-fidelity-20261021`.
-Прежний рабочий образ сохранён как `major-decision:rollback-fidelity-20261021`.
+Текущий выпуск визуальной версии `3ac676a`: `major-decision:release-perceptual-20261023`.
+Прежний рабочий `bee1d41` сохранён как `major-decision:rollback-perceptual-20261023`.
 Для отката на big-one присвоить этому сохранённому образу `major-decision:latest`,
 затем выполнить адресный `compose up` для `web` и публичный smoke. Точные
 image/source/HTML hashes и результаты текущего выпуска — в верхнем разделе HANDOFF.
@@ -101,7 +104,7 @@ Dockerfile, nginx.conf, Compose и сети `caddy_net`; затем build → sc
 сайту не нужно. Film originals нужны для художественной сверки, а не для
 сборки/работы сайта; хранить их отдельно, с исходным manifest.
 
-Выпуск 21.10.2026 проверен по публичному HTTPS; точные hashes, production
+Выпуск 23.10.2026 проверен по публичному HTTPS; точные hashes, production
 smoke, мониторинг, CI и границы проверки записаны в HANDOFF. Регистрация
 отдельного CI-runner хранится в локальном ignored bundle и описана в CI.md.
 Пользователь отменил отдельный backup/recovery export: после утраты

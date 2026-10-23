@@ -1,5 +1,10 @@
 # Поле, спираль и нижний вход — 2026-10-18
 
+> Исторический протокол 18 октября. Указанная здесь `.review` уже отсутствовала
+> на старте прохода 20 октября; эти пути не являются доступными артефактами.
+> Сохранённые текущие [сравнения](visual-comparison.html) и [статус](HANDOFF.md)
+> находятся отдельно.
+
 Продолжение этапа 2. Версия перед этим проходом сохранена в
 `.review/before-layout/`: 566 файлов с SHA-256 в `snapshot.json`, включая
 исходники, документы, полный экспорт и видео. Художественное принятие
@@ -111,12 +116,12 @@ SHA этой сборки и границы проверки — в HANDOFF.
 
 [Страница сравнения](visual-comparison.html) по умолчанию показывает
 `before-layout`; все четыре прежние версии доступны отдельно.
-Шесть троек кадров: [YES](../.review/layout/comparisons/yes-contact-sheet.png) ·
-[NO](../.review/layout/comparisons/no-contact-sheet.png).
-Полные три колонки: [YES](../.review/layout/comparisons/yes-full.mp4) ·
-[NO](../.review/layout/comparisons/no-full.mp4).
-Отдельные последовательности: [YES](../.review/playback-yes.mp4) ·
-[NO](../.review/playback-no.mp4).
+Шесть троек кадров: YES — `.review/layout/comparisons/yes-contact-sheet.png` ·
+NO — `.review/layout/comparisons/no-contact-sheet.png`.
+Полные три колонки: YES — `.review/layout/comparisons/yes-full.mp4` ·
+NO — `.review/layout/comparisons/no-full.mp4`.
+Отдельные последовательности: YES — `.review/playback-yes.mp4` ·
+NO — `.review/playback-no.mp4`.
 
 Точная ширина и наклон витков, вид отверстий и рефракция ещё отличаются.
 Поднятый источник вывел звезду из .95 s, но в стартовом ракурсе около .4 s

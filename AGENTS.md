@@ -7,7 +7,8 @@ and a submodule of `server`. It recreates the website seen in Interstate 60.
 
 Read `docs/PLAN.md`, `docs/HANDOFF.md`, and the relevant parts of
 `docs/REFERENCE.md` before changing the application. Also read
-`docs/VISUAL_REVIEW.md`: the current shell has unresolved visual differences.
+`docs/VISUAL_REVIEW.md` and `docs/PERCEPTUAL_REVIEW.md` for the current visual
+verdict, historical differences, and limits of verification.
 `docs/NEXT_CHAT_PROMPT.md` contains the ready-to-use continuation task. Use the supplied film frames
 as the visual authority. Do not replace the design with a contemporary dashboard.
 
@@ -31,6 +32,9 @@ as the visual authority. Do not replace the design with a contemporary dashboard
   Docker/Caddy infrastructure. Use the scoped release procedure in docs/DEPLOYMENT.md.
 - Update HANDOFF with actual verification, remaining work, and accepted visual
   changes at the end of a phase. Keep assumptions distinct from film evidence.
+- Periodically clean reproducible `.review` duplicates on both DE and big-one.
+  First retain useful evidence under ignored `references/review/` and verify
+  its hashes. Preserve originals, previous comparisons, and active check output.
 - No automatic commits or pushes are implied by a documentation update.
 
 ## Scope

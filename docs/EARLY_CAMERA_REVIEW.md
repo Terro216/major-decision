@@ -1,5 +1,10 @@
 # Ранние ракурсы и веер штырей — 2026-10-18
 
+> Исторический протокол 18 октября. Указанная здесь `.review` уже отсутствовала
+> на старте прохода 20 октября; эти пути не являются доступными артефактами.
+> Сохранённые текущие [сравнения](visual-comparison.html) и [статус](HANDOFF.md)
+> находятся отдельно.
+
 История прохода до **14:20 MSK**. Его результат сохранён в
 `.review/before-layout/`; следующий проход меняет взаимную раскладку поля
 и спирали и описан в [LAYOUT_REVIEW](LAYOUT_REVIEW.md). Текущие проверки и SHA —
@@ -75,11 +80,11 @@
 
 [Страница сравнения](visual-comparison.html) по умолчанию показывает
 `before-early-camera`; все три прежние версии также доступны.
-[YES](../.review/early-camera/comparisons/yes-contact-sheet.png) и
-[NO](../.review/early-camera/comparisons/no-contact-sheet.png) — шесть троек
+YES — `.review/early-camera/comparisons/yes-contact-sheet.png` и
+NO — `.review/early-camera/comparisons/no-contact-sheet.png` — шесть троек
 каждой ветки. Полные тройные MP4:
-[YES](../.review/early-camera/comparisons/yes-full.mp4) ·
-[NO](../.review/early-camera/comparisons/no-full.mp4).
+YES — `.review/early-camera/comparisons/yes-full.mp4` ·
+NO — `.review/early-camera/comparisons/no-full.mp4`.
 
 Итоговый полный прогон **13:59:34 MSK — 23/23 за 13.0 min**, 14/14 точных
 повторений WebGL-кадров после перемотки. Просмотрены все 334 экспортированных

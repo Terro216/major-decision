@@ -1,5 +1,10 @@
 # Камера, мишень и индикатор — 2026-10-18
 
+> Исторический протокол 18 октября. Указанная здесь `.review` уже отсутствовала
+> на старте прохода 20 октября; эти пути не являются доступными артефактами.
+> Сохранённые текущие [сравнения](visual-comparison.html) и [статус](HANDOFF.md)
+> находятся отдельно.
+
 История прохода до **06:12 MSK**. Его результат теперь сохранён в
 `.review/before-materials/`; более поздняя доводка поверхностей описана в
 [MATERIAL_REVIEW](MATERIAL_REVIEW.md). Текущие проверки и SHA — в HANDOFF.
@@ -96,12 +101,12 @@
 `before-framing`. По умолчанию теперь выбрана более поздняя `before-materials`;
 правая колонка и пересобранные видео показывают текущие материалы.
 
-- Шесть кадров каждой ветки: [YES](../.review/framing/comparisons/yes-contact-sheet.png)
-  и [NO](../.review/framing/comparisons/no-contact-sheet.png).
-- Полные три колонки: [YES](../.review/framing/comparisons/yes-full.mp4)
-  и [NO](../.review/framing/comparisons/no-full.mp4).
-- Текущие полные последовательности: [YES](../.review/playback-yes.mp4)
-  и [NO](../.review/playback-no.mp4).
+- Шесть кадров каждой ветки: YES — `.review/framing/comparisons/yes-contact-sheet.png`
+  и NO — `.review/framing/comparisons/no-contact-sheet.png`.
+- Полные три колонки: YES — `.review/framing/comparisons/yes-full.mp4`
+  и NO — `.review/framing/comparisons/no-full.mp4`.
+- Текущие полные последовательности: YES — `.review/playback-yes.mp4`
+  и NO — `.review/playback-no.mp4`.
 
 Фактический итог полного прогона, SHA сборки и обновлённого экспорта записаны
 в [HANDOFF](HANDOFF.md). Просмотрены все 334 свежих кадра и новые тройные листы;
