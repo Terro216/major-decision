@@ -31,6 +31,12 @@ test('inactive film sections stay disabled and are skipped by the keyboard', asy
   }
   await page.getByRole('button', { name: 'NEW QUESTION' }).focus();
   await page.keyboard.press('Tab');
+  await expect(page.getByRole('button', { name: 'Movie', exact: true })).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(page.getByRole('button', { name: 'Freestyle', exact: true })).toBeFocused();
+  await page.keyboard.press('Space');
+  await expect(page.getByRole('button', { name: 'Freestyle', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await page.keyboard.press('Tab');
   await expect(page.getByRole('button', { name: /BROWSER FRAME/ })).toBeFocused();
 });
 
