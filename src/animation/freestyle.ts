@@ -167,7 +167,12 @@ export function createFreestyle(seed: number, scenario: Scenario) {
     const wide = [...add(aim, [sign * -6, 14, 14]), ...aim, 45, 0];
     if (time < fieldEnd) {
       const blend = smooth((time - .65) / .5);
-      return original.map((v, i) => v + (wide[i] - v) * blend);
+      // The free launch descends along a different path from the authored
+      // film launch. Translate its opening camera with the actual sphere
+      // before blending to the broad field view, so it never leaves the shot.
+      const offset = sub(p, filmBallAt(visual, path));
+      const opening = original.map((v, i) => i < 6 ? v + offset[i % 3] : v);
+      return opening.map((v, i) => v + (wide[i] - v) * blend);
     }
     if (time < inletTime) {
       const inletView = filmCameraAt(filmTiming[path].entry, path);
