@@ -20,8 +20,31 @@ check = read('check-result.json')
 assert check['testExit'] == 0 and check['selection'] == ['all'], 'Require a successful full run.'
 inputs = read('build-inputs.json')
 assert inputs['sourceSha256'] == check['sourceSha256']
-for name, expected in inputs['files'].items():
-    assert digest(ROOT / name) == expected, f'Checked source changed: {name}'
+changed = [name for name, expected in inputs['files'].items() if digest(ROOT / name) != expected]
+if changed:
+    # A later test-only correction does not require replacing identical public
+    # app bytes. Keep the original release evidence and verify the newer full
+    # CI independently, including every current input and all deployed assets.
+    assert all(name.startswith('tests/') for name in changed), f'Reviewed app source changed: {changed}'
+    ci_inputs = read('ci/build-inputs.json')
+    ci_check = read('ci/check-result.json')
+    ci_verification = read('ci-verification.json')
+    ci_result = read('ci-result.json')
+    assert ci_check['testExit'] == 0 and ci_check['selection'] == ['all']
+    assert ci_check['sourceSha256'] == ci_inputs['sourceSha256'] == ci_verification['sourceSha256']
+    assert ci_check['indexSha256'] == check['indexSha256'] == ci_verification['indexSha256']
+    assert set(ci_inputs['files']) == set(inputs['files']), 'Input inventory changed.'
+    for name, expected in ci_inputs['files'].items():
+        assert digest(ROOT / name) == expected, f'Current CI source changed: {name}'
+        if not name.startswith('tests/'):
+            assert expected == inputs['files'][name], f'CI app differs from the release: {name}'
+    assert ci_result['status'] == 'completed' and ci_result['conclusion'] == 'success'
+    assert ci_result['headSha'] == ci_verification['headSha']
+    assert ci_result['runId'] == ci_verification['runId']
+    assert ci_verification['distFilesEqualProduction'] == read('release-image.json')['files']
+    assert digest(OUT / 'ci-artifact.zip') == ci_verification['artifactDigest']
+    assert read('ci-artifact-metadata.json')['digest'] == 'sha256:' + ci_verification['artifactDigest']
+    print(f'Verified later full CI for test-only changes: {", ".join(changed)}.')
 for phase, keys in [('after', ['yes', 'no']), ('cross', ['left-no', 'right-yes'])]:
     export = read(f'{phase}-export.json')
     assert export['build'] == check['indexSha256']

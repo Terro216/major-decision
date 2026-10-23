@@ -26,18 +26,49 @@ for (const [outcome, bit] of [['yes', 1], ['no', 0]] as const) {
     page.on('pageerror', error => errors.push(error.message));
     await page.goto('/');
     await page.getByRole('textbox').fill('Выбрать этот путь?');
+    // Trace snapshots can delay the click response past the whole real-time
+    // journey on two-CPU SwiftShader. Observe transient running-state guards
+    // in the page, before clicking, rather than racing the protocol response.
+    await page.evaluate(() => {
+      const stage = document.querySelector<HTMLElement>('.decision-stage')!;
+      const form = document.querySelector<HTMLFormElement>('form')!;
+      const ask = document.querySelector<HTMLButtonElement>('.ask-button')!;
+      const question = document.querySelector<HTMLTextAreaElement>('#question')!;
+      const journey = { samples: [] as { phase: string; time: number; wall: number; outcome: string; renderer: string; disabled: boolean; readOnly: boolean }[], guardedSubmits: 0 };
+      (window as any).decisionJourney = journey;
+      const observer = new MutationObserver(() => {
+        const phase = stage.dataset.phase!;
+        journey.samples.push({ phase, time: Number(stage.dataset.time), wall: performance.now(), outcome: stage.dataset.outcome!, renderer: stage.dataset.renderer!, disabled: ask.disabled, readOnly: question.readOnly });
+        if (phase === 'running' && journey.guardedSubmits === 0) {
+          // The state guard must also reject direct submissions while running.
+          journey.guardedSubmits = 4;
+          for (let i = 0; i < journey.guardedSubmits; i++) form.requestSubmit();
+        }
+        if (phase === 'result') observer.disconnect();
+      });
+      observer.observe(stage, { attributes: true, attributeFilter: ['data-phase', 'data-time', 'data-outcome', 'data-renderer'] });
+    });
     await page.getByRole('button', { name: 'Ask the question' }).click();
     const stage = page.locator('.decision-stage');
-    await expect(stage).toHaveAttribute('data-phase', 'running');
     await expect(stage).toHaveAttribute('data-renderer', 'webgl');
     await expect(page.getByRole('button', { name: 'Ask the question' })).toBeDisabled();
-    await expect(page.getByRole('textbox')).toHaveAttribute('readonly', '');
-    // Directly submit too: the state guard must work beyond a disabled button.
-    await page.locator('form').evaluate(form => { for (let i = 0; i < 4; i++) (form as HTMLFormElement).requestSubmit(); });
     await expect(stage).toHaveAttribute('data-outcome', outcome);
     await expect(page.getByRole('status')).toHaveText(outcome.toUpperCase(), { timeout: 15_000 });
+    const journey = await page.evaluate(() => (window as any).decisionJourney) as { samples: { phase: string; time: number; wall: number; outcome: string; renderer: string; disabled: boolean; readOnly: boolean }[]; guardedSubmits: number };
+    const running = journey.samples.filter(sample => sample.phase === 'running');
+    expect(running.length).toBeGreaterThan(1);
+    expect(running[0].time).toBe(0);
+    expect(running.some(sample => sample.time > 0 && sample.time < 6.9)).toBe(true);
+    expect(running.every(sample => sample.disabled && sample.readOnly)).toBe(true);
+    expect(journey.guardedSubmits).toBe(4);
+    expect(journey.samples.every(sample => sample.outcome === outcome && sample.renderer === 'webgl')).toBe(true);
+    expect(journey.samples.every((sample, i, all) => i === 0 || sample.time >= all[i - 1].time)).toBe(true);
+    expect(journey.samples.at(-1)).toMatchObject({ phase: 'result', time: 6.9 });
+    expect(journey.samples.at(-1)!.wall - running[0].wall).toBeGreaterThanOrEqual(6_700);
     expect(await page.evaluate(() => (window as any).decisionDraws)).toBe(1);
     expect(errors).toEqual([]);
+    const artifacts = process.env.MD_REVIEW_DIR || '.review';
+    await writeFile(path.join(artifacts, `real-${outcome}-journey-check.json`), JSON.stringify(journey, null, 2));
   });
 }
 
