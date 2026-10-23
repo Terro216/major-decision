@@ -46,13 +46,13 @@ function SmallIcon({ kind, x, y, radius }: { kind: 'hand' | 'orbit' | 'blocks' |
 }
 
 export function Frame() {
-  return <svg className="frame-art" viewBox="0 0 1600 920" aria-hidden="true">
+  return <svg className="frame-art" viewBox="0 0 1600 980" aria-hidden="true">
     <defs>
       <linearGradient id="body-blue" x2=".9" y2="1"><stop stopColor="#16469c"/><stop offset=".4" stopColor="#123a8a"/><stop offset="1" stopColor="#112d74"/></linearGradient>
       <radialGradient id="body-light" cx=".04" cy=".55" r=".8"><stop stopColor="#204fa3" stopOpacity=".7"/><stop offset="1" stopColor="#0c205f" stopOpacity="0"/></radialGradient>
       <linearGradient id="body-edge-shadow" x1="0" y1="0" x2=".10" y2="0"><stop stopColor="#020b28" stopOpacity=".42"/><stop offset="1" stopColor="#020b28" stopOpacity="0"/></linearGradient>
       <linearGradient id="body-shadow-y" x1="0" y1="0" x2="0" y2="1"><stop offset=".18" stopColor="black"/><stop offset=".34" stopColor="white"/></linearGradient>
-      <mask id="body-shadow-mask"><rect width="1600" height="920" fill="url(#body-shadow-y)"/></mask>
+      <mask id="body-shadow-mask"><rect width="1600" height="980" fill="url(#body-shadow-y)"/></mask>
       <linearGradient id="edge-blue" x1="1" y1="0" x2="0" y2="1"><stop stopColor="#071331"/><stop offset=".65" stopColor="#15336f"/><stop offset=".91" stopColor="#3376bd"/><stop offset=".98" stopColor="#8ce6f4"/><stop offset="1" stopColor="#234e91"/></linearGradient>
       <linearGradient id="stage-trim" x1="0" y1="0" x2="1" y2="1"><stop stopColor="#daf4ff"/><stop offset=".4" stopColor="#c0cde5"/><stop offset="1" stopColor="#9eb5d4"/></linearGradient>
       <linearGradient id="icon-bezel" x1=".75" y1="0" x2=".15" y2="1"><stop stopColor="#091d4f"/><stop offset=".48" stopColor="#12347d"/><stop offset=".78" stopColor="#316aa9"/><stop offset=".94" stopColor="#80d8e9"/><stop offset="1" stopColor="#214c8b"/></linearGradient>
@@ -62,10 +62,10 @@ export function Frame() {
       <linearGradient id="edge-glint" x1="0" y1="0" x2="1" y2="0"><stop stopColor="#dbffff"/><stop offset=".35" stopColor="#64ccea"/><stop offset="1" stopColor="#286bb7" stopOpacity="0"/></linearGradient>
       <filter id="cast-edge" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="2"/></filter>
     </defs>
-    <rect x="4" y="4" width="1592" height="912" rx="16" fill="url(#body-blue)" stroke="#061731" strokeWidth="8"/>
-    <rect x="12" y="12" width="1576" height="900" fill="url(#body-light)"/>
-    <rect x="12" y="12" width="1576" height="900" fill="url(#body-edge-shadow)" mask="url(#body-shadow-mask)"/>
-    <path d="M10 15H1574Q1592 10 1592 29V898" fill="none" stroke="#3166b2" strokeWidth="5"/>
+    <rect x="4" y="4" width="1592" height="972" rx="16" fill="url(#body-blue)" stroke="#061731" strokeWidth="8"/>
+    <rect x="12" y="12" width="1576" height="960" fill="url(#body-light)"/>
+    <rect x="12" y="12" width="1576" height="960" fill="url(#body-edge-shadow)" mask="url(#body-shadow-mask)"/>
+    <path d="M10 15H1574Q1592 10 1592 29V958" fill="none" stroke="#3166b2" strokeWidth="5"/>
     <path d="M1585 13l-9 8" stroke="#c6f8ff" strokeWidth="3"/>
     <rect x="402" y="10" width="1181" height="151" rx="17" fill="#030b0b" stroke="#0c2053" strokeWidth="16"/>
     <rect x="402" y="10" width="1181" height="151" rx="17" fill="none" stroke="url(#edge-blue)" strokeWidth="7"/>

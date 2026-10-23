@@ -37,8 +37,10 @@ test('film framing: late enlargement and target approach agree with observed scr
   // visually checked; clipped/occluded late-fan detections are excluded.
   // These bounds remain composition guards, not a similarity score.
   const observed: Record<Outcome, number[][]> = {
-    yes: [[5.1,0.647681451613,0.415454545455,0.258181818182],[5.23333333333,0.56502016129,0.360909090909,0.367272727273],[5.3,0.668850806452,0.379090909091,0.421818181818],[5.43333333333,0.587701612903,0.517272727273,0.387272727273],[5.63333333333,0.525705645161,0.49,0.330909090909]],
-    no: [[5.1,0.524697580645,0.371818181818,0.214545454545],[5.23333333333,0.407762096774,0.41,0.247272727273],[5.3,0.473286290323,0.373636363636,0.356363636364],[5.43333333333,0.318044354839,0.458181818182,0.421818181818],[5.63333333333,0.492943548387,0.437272727273,0.274545454545]],
+    // A repeated exposure now describes the middle of its interval, not a
+    // stop lasting several frames. The measured positions/sizes are unchanged.
+    yes: [[154/30,0.647681451613,0.415454545455,0.258181818182],[157.5/30,0.56502016129,0.360909090909,0.367272727273],[159.5/30,0.668850806452,0.379090909091,0.421818181818],[164.5/30,0.587701612903,0.517272727273,0.387272727273],[168/30,0.525705645161,0.49,0.330909090909]],
+    no: [[153.5/30,0.524697580645,0.371818181818,0.214545454545],[156/30,0.407762096774,0.41,0.247272727273],[159.5/30,0.473286290323,0.373636363636,0.356363636364],[163/30,0.318044354839,0.458181818182,0.421818181818],[169/30,0.492943548387,0.437272727273,0.274545454545]],
   };
   const report=[];
   for(const outcome of ['yes','no'] as const) {
@@ -49,17 +51,18 @@ test('film framing: late enlargement and target approach agree with observed scr
       expect(Math.abs(actual.diameter-diameter)).toBeLessThan(.04);
       report.push({outcome,time,observed:{x,y,diameter},actual});
     }
-    const ball=projection(169/30,outcome), target=projection(169/30,outcome,targetFrame(outcome).center);
+    const approachTime=(outcome==='yes'?168:169)/30;
+    const ball=projection(approachTime,outcome), target=projection(approachTime,outcome,targetFrame(outcome).center);
     expect((target.x-ball.x)*(outcome==='yes'?1:-1)).toBeGreaterThan(.12);
     expect(target.y).toBeLessThan(ball.y);
     // The disc and ball must agree in the SAME source frame. Matching the
     // sphere alone previously hid a target that entered far too close to it.
     const approachFrame=targetFrame(outcome);
     const approachCentre=add(approachFrame.center,mul(approachFrame.normal,TARGET.face*TARGET.scale));
-    const approach=projection(169/30,outcome,approachCentre);
+    const approach=projection(approachTime,outcome,approachCentre);
     const expectedApproach=outcome==='yes'?{x:.805,y:.136,diameter:.676}:{x:.326,y:.180,diameter:.651};
-    const approachTop=projection(169/30,outcome,add(approachCentre,mul(approachFrame.up,1.10*TARGET.scale)));
-    const approachBottom=projection(169/30,outcome,add(approachCentre,mul(approachFrame.up,-1.10*TARGET.scale)));
+    const approachTop=projection(approachTime,outcome,add(approachCentre,mul(approachFrame.up,1.10*TARGET.scale)));
+    const approachBottom=projection(approachTime,outcome,add(approachCentre,mul(approachFrame.up,-1.10*TARGET.scale)));
     expect(Math.abs(approach.x-expectedApproach.x)).toBeLessThan(.04);
     expect(Math.abs(approach.y-expectedApproach.y)).toBeLessThan(.04);
     if(outcome==='yes') {

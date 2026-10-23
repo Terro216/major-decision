@@ -28,19 +28,23 @@ assert.equal((await fetch(origin+'/',{method:'POST',body:'synthetic-smoke'})).st
 const browser = await chromium.launch({args:['--use-angle=swiftshader','--enable-unsafe-swiftshader']});
 const runs = [], resources = new Map();
 try {
-  for (const scenario of ['left','right']) for (const outcome of ['yes','no']) {
+  for (const mode of ['movie','freestyle']) for (const scenario of ['left','right']) for (const outcome of ['yes','no']) {
     const width=scenario==='left'?1000:390,height=scenario==='left'?900:844;
     const context=await browser.newContext({viewport:{width,height}});
     try {
-      await context.addInitScript(({scenario,outcome})=>{
+      await context.addInitScript(({scenario,outcome,mode})=>{
         const original=crypto.getRandomValues.bind(crypto);
-        window.smokeDraws={route:0,answer:0};
+        window.smokeDraws={route:0,seed:0,answer:0};
         crypto.getRandomValues=array=>{
-          if(array instanceof Uint32Array&&array.length===1){window.smokeDraws.route++;array[0]=scenario==='right'?1:0;return array;}
+          if(array instanceof Uint32Array&&array.length===1){
+            if(mode==='freestyle'&&window.smokeDraws.route>window.smokeDraws.seed){window.smokeDraws.seed++;array[0]=60;}
+            else{window.smokeDraws.route++;array[0]=scenario==='right'?1:0;}
+            return array;
+          }
           if(array instanceof Uint8Array&&array.length===1){window.smokeDraws.answer++;array[0]=outcome==='yes'?1:0;return array;}
           return original(array);
         };
-      },{scenario,outcome});
+      },{scenario,outcome,mode});
       const page=await context.newPage(),errors=[],requests=[];
       page.on('pageerror',e=>errors.push(e.message));
       page.on('console',message=>{if(message.type()==='error')errors.push(message.text());});
@@ -55,6 +59,7 @@ try {
       });
       await page.goto(origin+'/');
       assert.equal(await page.locator('.review-controls').count(),0);
+      await page.getByRole('button',{name:mode==='movie'?'Movie':'Freestyle',exact:true}).click();
       for(const name of ['HOROSCOPE','ROMANCE','CAREER']) assert(await page.getByRole('button',{name}).isDisabled());
       const input=page.getByRole('textbox',{name:'Your question'});
       await input.fill('Проверочный вопрос — останется ли он в этой вкладке?');
@@ -62,13 +67,13 @@ try {
       await page.waitForFunction(()=>document.querySelector('.decision-stage').dataset.phase==='result',{}, {timeout:25_000});
       assert.equal(await page.getByRole('status').innerText(),outcome.toUpperCase());
       const stage=await page.locator('.decision-stage').evaluate(element=>({...element.dataset}));
-      assert.equal(stage.scenario,scenario);assert.equal(stage.renderer,'webgl');
+      assert.equal(stage.scenario,scenario);assert.equal(stage.renderer,'webgl');assert.equal(stage.mode,mode);
       await page.locator('canvas').evaluate(canvas=>canvas.getContext('webgl2').finish());
-      assert.deepEqual(await page.evaluate(()=>window.smokeDraws),{route:1,answer:1});
+      assert.deepEqual(await page.evaluate(()=>window.smokeDraws),{route:1,seed:mode==='freestyle'?1:0,answer:1});
       assert.equal(await page.evaluate(()=>localStorage.length+sessionStorage.length),0);
       assert(requests.every(url=>url.startsWith(origin+'/')),JSON.stringify(requests));
       assert.equal(new URL(page.url()).search,'');
-      await page.screenshot({path:`${directory}/${scenario}-${outcome}.png`,fullPage:true});
+      await page.screenshot({path:`${directory}/${mode}-${scenario}-${outcome}.png`,fullPage:true});
       await page.getByRole('button',{name:/^SOUND/}).click();
       await page.waitForFunction(()=>[...document.querySelectorAll('button')].find(button=>button.textContent.startsWith('SOUND'))?.getAttribute('aria-pressed')==='true');
       assert.equal(await page.getByRole('button',{name:/^SOUND/}).getAttribute('aria-pressed'),'true');
@@ -78,7 +83,7 @@ try {
       assert.equal(await page.locator('canvas').count(),0);
       await Promise.all(collected);
       assert.deepEqual(errors,[]);
-      runs.push({scenario,outcome,width,height,renderer:stage.renderer,requests:requests.length,questionInStorage:false,errors});
+      runs.push({mode,scenario,outcome,width,height,renderer:stage.renderer,requests:requests.length,questionInStorage:false,errors});
     } finally {await context.close();}
   }
 } finally {await browser.close();}

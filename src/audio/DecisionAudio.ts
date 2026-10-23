@@ -1,19 +1,22 @@
 import { pathFor, type Scenario } from '../animation/scenario';
 import { pinContacts, timing } from '../animation/timeline';
 import type { Outcome } from '../animation/mechanism';
+import type { FreestyleRun } from '../animation/freestyle';
 
 type Note = { time: number; frequency: number; endFrequency?: number; duration: number; volume: number; type?: OscillatorType };
 
 // Original synthesized sound: soft mechanical pips, a spiral glide and a final
 // three-note chord. No film recordings, audio files, randomness or microphone.
-export function decisionNotes(scenario: Scenario, outcome: Outcome): Note[] {
+export function decisionNotes(scenario: Scenario, outcome: Outcome, freestyle?: FreestyleRun | null): Note[] {
   const path = pathFor(scenario);
+  const at = (time: number) => freestyle?.timeAtFilm(time) ?? time;
+  const contacts = freestyle ? freestyle.contacts.map(c => [c.time,c.index,c.color] as const) : pinContacts[path];
   return [
-    { time: timing[path].release, frequency: 180, endFrequency: 120, duration: .16, volume: .38, type: 'triangle' },
-    ...pinContacts[path].map(([time, , color], i) => ({ time, frequency: (color === 'yes' ? 640 : 480) + i * 35, endFrequency: 260, duration: .09, volume: .22 })),
-    { time: timing[path].pulseStart, frequency: 190, endFrequency: 920, duration: timing[path].pulseEnd - timing[path].pulseStart, volume: .18, type: 'triangle' },
-    { time: timing[path].hit, frequency: 150, endFrequency: 75, duration: .22, volume: .4, type: 'triangle' },
-    ...resultNotes(outcome, 6.20),
+    { time: at(timing[path].release), frequency: 180, endFrequency: 120, duration: .16, volume: .38, type: 'triangle' },
+    ...contacts.map(([time, , color], i) => ({ time, frequency: (color === 'yes' ? 640 : 480) + i * 35, endFrequency: 260, duration: .09, volume: .22 })),
+    { time: at(timing[path].pulseStart), frequency: 190, endFrequency: 920, duration: at(timing[path].pulseEnd) - at(timing[path].pulseStart), volume: .18, type: 'triangle' },
+    { time: at(timing[path].hit), frequency: 150, endFrequency: 75, duration: .22, volume: .4, type: 'triangle' },
+    ...resultNotes(outcome, at(6.20)),
   ];
 }
 
@@ -77,10 +80,10 @@ export class DecisionAudio {
     }
   }
 
-  play(scenario: Scenario, outcome: Outcome, from: number, rate: number) {
+  play(scenario: Scenario, outcome: Outcome, from: number, rate: number, freestyle?: FreestyleRun | null) {
     this.stop();
-    this.answerAt = this.context ? this.context.currentTime + (6.20 - from) / rate : Infinity;
-    this.notes(decisionNotes(scenario, outcome), from, rate);
+    this.answerAt = this.context ? this.context.currentTime + ((freestyle?.timeAtFilm(6.20) ?? 6.20) - from) / rate : Infinity;
+    this.notes(decisionNotes(scenario, outcome, freestyle), from, rate);
   }
 
   finish(outcome: Outcome) {

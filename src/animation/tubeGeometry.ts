@@ -106,17 +106,51 @@ export function tubeGeometry(outcome: Outcome) {
 // single unsorted mesh produced dark stripes at the overlap of its two skins.
 export function wallSorter(geometry: THREE.BufferGeometry) {
   const index = geometry.index!, original = Array.from(index.array);
-  const count = original.length / 3, order = Array.from({ length: count }, (_, i) => i);
+  const count = original.length / 3;
+  let order = new Uint32Array(count), scratch = new Uint32Array(count);
   const centers = new Float32Array(count * 3), depths = new Float64Array(count);
+  const words = new Uint32Array(depths.buffer), low = new Uint32Array(count), high = new Uint32Array(count), buckets = new Uint32Array(256);
+  const littleEndian = new Uint8Array(new Uint32Array([1]).buffer)[0] === 1;
+  // The live and reflected cameras alternate on every frame. Keep their
+  // independent orders: a fixed viewing direction needs no new triangle sort
+  // while the ball, pins and lights move. Quantization is below raster precision
+  // and is applied to the sort itself, so reverse seeks remain deterministic.
+  const cache = new Map<string, Uint16Array | Uint32Array>();
   const p = geometry.attributes.position;
   for (let i = 0; i < count; i++) for (let j = 0; j < 3; j++) {
     const v = original[i * 3 + j];
     centers[i*3] += p.getX(v) / 3; centers[i*3+1] += p.getY(v) / 3; centers[i*3+2] += p.getZ(v) / 3;
   }
   return (direction: THREE.Vector3) => {
-    for (let i=0;i<count;i++) depths[i]=centers[i*3]*direction.x+centers[i*3+1]*direction.y+centers[i*3+2]*direction.z;
-    order.sort((a,b)=>depths[b]-depths[a] || a-b);
+    const components = [direction.x,direction.y,direction.z].map(v => Number(v.toFixed(10)));
+    const key = components.join(',');
+    const cached = cache.get(key);
+    if (cached) { index.array.set(cached); index.needsUpdate=true; return; }
+    for (let i=0;i<count;i++) {
+      const depth = centers[i*3]*components[0]+centers[i*3+1]*components[1]+centers[i*3+2]*components[2];
+      depths[i] = depth === 0 ? 0 : depth; // +0 and -0 are the same depth.
+      const hi = words[i*2+(littleEndian?1:0)], lo = words[i*2+(littleEndian?0:1)];
+      // Transform IEEE-754 doubles into descending unsigned keys. Keep all
+      // 64 bits: rounding depth to float32 can reorder nearly coplanar faces.
+      high[i] = hi & 0x80000000 ? hi : (~hi ^ 0x80000000) >>> 0;
+      low[i] = hi & 0x80000000 ? lo : ~lo >>> 0;
+      order[i] = i;
+    }
+    // Stable byte-wise radix ordering avoids two large comparator sorts per
+    // moving frame. Original triangle order breaks exact depth ties, just as
+    // the former depth[b]-depth[a] || a-b comparator did.
+    for (let pass=0;pass<8;pass++) {
+      const keys = pass < 4 ? low : high, shift = (pass%4)*8;
+      buckets.fill(0);
+      for (let i=0;i<count;i++) buckets[(keys[order[i]]>>>shift)&255]++;
+      let offset=0;
+      for (let byte=0;byte<256;byte++) { const size=buckets[byte]; buckets[byte]=offset; offset+=size; }
+      for (let i=0;i<count;i++) { const id=order[i]; scratch[buckets[(keys[id]>>>shift)&255]++]=id; }
+      [order,scratch]=[scratch,order];
+    }
     for (let i=0;i<count;i++) for(let j=0;j<3;j++) index.array[i*3+j]=original[order[i]*3+j];
+    if (cache.size >= 4) cache.delete(cache.keys().next().value!);
+    cache.set(key, index.array.slice() as Uint16Array | Uint32Array);
     index.needsUpdate=true;
   };
 }

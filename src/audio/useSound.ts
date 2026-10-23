@@ -9,7 +9,7 @@ export function useSound(decision: Decision, rate: number) {
   const [enabled, setEnabled] = useState(false);
   const [error, setError] = useState('');
   const [visible, setVisible] = useState(!document.hidden);
-  const { phase, outcome, scenario, time, playing } = decision;
+  const { phase, outcome, scenario, time, playing, freestyle } = decision;
 
   useEffect(() => {
     const visibility = async () => {
@@ -28,11 +28,11 @@ export function useSound(decision: Decision, rate: number) {
     if (!sound) return;
     if (!enabled || !visible) { sound.stop(); return; }
     if (phase === 'result') sound.finish(outcome);
-    else if (phase === 'running' && playing) sound.play(scenario, outcome, time, rate);
+    else if (phase === 'running' && playing) sound.play(scenario, outcome, time, rate, freestyle);
     else sound.stop();
     // time deliberately supplies the start point only. Re-scheduling each RAF
     // would repeatedly trigger notes; pause/resume and seek change playing.
-  }, [enabled, visible, phase, playing, outcome, scenario, rate]);
+  }, [enabled, visible, phase, playing, outcome, scenario, rate, freestyle]);
 
   return {
     enabled, error,

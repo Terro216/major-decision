@@ -1,6 +1,7 @@
 import { flightCurveBreaks, flightParameterSpeedBound, TARGET, type Outcome } from './mechanism.ts';
 import { bernsteinAt, bernsteinSplit, bernsteinUpperBound } from './motionCurve.ts';
 import { exitViews } from './exitViews.ts';
+import { exposureKeys } from './exposureKeys.ts';
 
 // Bound temporal speed and spatial stretch on the same subinterval. Their
 // separate maxima can be far apart during an advance out of the curved leg.
@@ -11,7 +12,7 @@ function worldSpeedBound(points: readonly number[], velocity: readonly number[],
   return Math.max(worldSpeedBound(p[0],v[0],route,depth-1),worldSpeedBound(p[1],v[1],route,depth-1));
 }
 
-// The final filmed poses hold, then close the remaining distance rapidly.
+// The final filmed poses repeat, then close the remaining distance rapidly.
 // The last two depths are fitted jointly from the sphere and target disc,
 // keeping their physical sizes fixed. Intermediate depth is inferred.
 export function flightMotion(route: Outcome, start: number, visibleExit: number, end: number, initialSpeed: number) {
@@ -20,9 +21,10 @@ export function flightMotion(route: Outcome, start: number, visibleExit: number,
   // frame separate from the centre's earlier physical crossing.
   const clearDistance = route === 'yes' ? 1.392 : 1.125;
   // The static landmarks constrain depth and camera together, through the
-  // last approach. Preserve each observed hold on the same continuous path.
+  // last approach. Interpolate through each exposure group's midpoint so a
+  // duplicated photograph does not become a pause in the live scene.
   const keys = [[start, 0], [visibleExit, clearDistance],
-    ...exitViews[route].filter(([frame])=>frame/30<end).map(([frame,,,,,distance])=>[frame/30,distance]),
+    ...exposureKeys(exitViews[route].filter(([frame])=>frame/30<end).map(([frame,,,,,distance])=>[frame/30,distance])),
     [end, TARGET.flight]];
   const slopes = keys.slice(1).map(([time, distance], i) => (distance-keys[i][1])/(time-keys[i][0]));
   const speeds = keys.map((_, i) => {

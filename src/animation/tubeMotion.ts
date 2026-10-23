@@ -1,5 +1,6 @@
 import { tubeLength, type Outcome } from './mechanism.ts';
 import { bernsteinAt, bernsteinUpperBound } from './motionCurve.ts';
+import { exposureKeys } from './exposureKeys.ts';
 
 // Original 30 fps frames hold these poses. Fractions are reconstructed on the
 // fixed tube from cameras fitted to its mouths, silhouette and distant source.
@@ -17,7 +18,7 @@ export const tubePoses: Record<Outcome, readonly (readonly [number, number])[]> 
 };
 
 export function buildTubeMotion(route: Outcome, start: number, end: number, entrySpeed: number, exitSpeed: number) {
-  const keys = [[start, 0], ...tubePoses[route].map(([time, fraction]) => [time, fraction * tubeLength]), [end, tubeLength]];
+  const keys = [[start, 0], ...exposureKeys(tubePoses[route]).map(([time, fraction]) => [time, fraction * tubeLength]), [end, tubeLength]];
   const slopes = keys.slice(1).map(([time, distance], i) => (distance - keys[i][1]) / (time - keys[i][0]));
   const speeds = keys.map((_, i) => i === 0 ? entrySpeed : i === keys.length - 1 ? exitSpeed : Math.min(slopes[i - 1], slopes[i]));
   // Endpoint velocities are inherited from the adjoining paths. Limit the
@@ -27,7 +28,8 @@ export function buildTubeMotion(route: Outcome, start: number, end: number, entr
   const segments = slopes.map((_, i) => {
     const [from, a] = keys[i], [to, b] = keys[i + 1], dt = to - from;
     // Quintic Hermite in Bernstein form: specified velocity, zero acceleration
-    // at every end. Repeated distances produce an exact stationary interval.
+    // at every end. Exposure groups above have one key each, so the live ball
+    // keeps moving between the photographed poses.
     const controls = [a, a + dt * speeds[i] / 5, a + 2 * dt * speeds[i] / 5,
       b - 2 * dt * speeds[i + 1] / 5, b - dt * speeds[i + 1] / 5, b];
     const velocity = controls.slice(1).map((value, j) => 5 * (value - controls[j]) / dt);

@@ -10,6 +10,7 @@ import { tubeGeometry, wallSorter } from './tubeGeometry';
 import { answerSurface, ballSurface, pinSurface, starEdgeSurface, starSurface, tubeSurface } from './surfaces';
 import { ballRadiance } from './ballRadiance';
 import { backdropGLSL, createBackdrop, openingFloorEdge } from './backdrop';
+import type { FreestyleRun } from './freestyle';
 export type ReviewView = 'film' | 'top' | 'side' | 'mouth';
 const COLORS = { yes: '#37bc25', no: '#dc2814', purple: '#b660d0', cyan: '#65aaee' };
 
@@ -113,7 +114,7 @@ function orangeTexture() {
 }
 
 export function createScene(canvas: HTMLCanvasElement) {
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: 'low-power' });
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: 'high-performance' });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
   renderer.setClearColor(0x080f2c, 0);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -304,30 +305,58 @@ export function createScene(canvas: HTMLCanvasElement) {
   });
   const texture = orangeTexture();
   const ballMaterial = ballSurface(texture);
-  // A luminous sphere during the pulse, as in the reference. Multiplying its
-  // green emission by the orange albedo suppressed it inside the real wall.
-  // The mesh, depth test, radius and wall opacity are identical in both states.
-  const glowingBallMaterial = new THREE.MeshBasicMaterial({ color: '#82ff52' });
+  // A warm luminous sphere stays visible through the real wall without
+  // disclosing the answer. Its radius and depth test remain unchanged.
+  const glowingBallMaterial = new THREE.MeshBasicMaterial({ color: '#ffc568' });
   const ball = new THREE.Mesh<THREE.SphereGeometry, THREE.MeshPhongMaterial | THREE.MeshBasicMaterial>(new THREE.SphereGeometry(BALL_RADIUS, 40, 28), ballMaterial);
   world.add(ball);
   // The travelling pulse illuminates the nearby real wall. This keeps its
   // position legible through dense glass without thinning the distant skins.
-  const pulse = new THREE.PointLight('#75ff48', 0, 2.8, 2);
+  const pulse = new THREE.PointLight('#ffc568', 0, 2.8, 2);
   world.add(pulse);
+  const guides = new THREE.Group();
+  world.add(guides);
+  const guideMaterial = new THREE.MeshPhongMaterial({ color: '#4079a0', specular: '#c0e7f3', shininess: 75 });
+  let guideRun: FreestyleRun | null = null;
+  const guideRail = (points: THREE.Vector3[]) => guides.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(points), Math.max(8, points.length), .10, 8, false), guideMaterial));
+  function updateGuides(run: FreestyleRun | null, path: Outcome) {
+    if (run === guideRun) return;
+    for (const child of guides.children) (child as THREE.Mesh).geometry.dispose();
+    guides.clear(); guideRun = run;
+    if (!run) return;
+    const s = side(path), clearance = BALL_RADIUS + .10;
+    for (const x of [-10.5 - clearance, 7.5 + clearance]) guideRail([
+      new THREE.Vector3(s*x,BALL_RADIUS,-9.5-clearance), new THREE.Vector3(s*x,BALL_RADIUS,6.5),
+    ]);
+    guideRail([new THREE.Vector3(s*(-10.5-clearance),BALL_RADIUS,-9.5-clearance),new THREE.Vector3(s*(7.5+clearance),BALL_RADIUS,-9.5-clearance)]);
+    for (const side of [-1, 1]) {
+      const rail = Array.from({ length: 97 }, (_, i) => {
+        const d = run.guideLength*i/96, p = new THREE.Vector3(...run.guidePoint(d));
+        const a = new THREE.Vector3(...run.guidePoint(Math.max(0,d-.01)));
+        const b = new THREE.Vector3(...run.guidePoint(Math.min(run.guideLength,d+.01)));
+        const normal = b.sub(a).cross(new THREE.Vector3(0,1,0)).normalize();
+        return p.addScaledVector(normal,side*clearance);
+      });
+      guideRail(rail);
+    }
+  }
   let lastTime = 0, lastOutcome: Outcome = 'yes', lastView: ReviewView = 'film', lastOpaque = false, disposed = false;
   let lastScenario: Scenario = 'left';
+  let lastFreestyle: FreestyleRun | null = null;
 
-  function render(time: number, outcome: Outcome, scenario: Scenario, view: ReviewView = 'film', opaque = false) {
+  function render(time: number, outcome: Outcome, scenario: Scenario, view: ReviewView = 'film', opaque = false, freestyle: FreestyleRun | null = null) {
     if (disposed) return;
-    lastTime = clamp(time, 0, DURATION); lastOutcome = outcome; lastView = view; lastOpaque = opaque;
+    lastTime = clamp(time, 0, freestyle?.duration ?? DURATION); lastOutcome = outcome; lastView = view; lastOpaque = opaque;
     lastScenario = scenario;
+    lastFreestyle = freestyle;
     const path = pathFor(scenario);
-    const t = lastTime, c = cameraAt(t, path), f = targetFrame(path);
+    updateGuides(freestyle, path);
+    const t = freestyle?.filmTime(lastTime) ?? lastTime, c = freestyle?.cameraAt(lastTime) ?? cameraAt(t, path), f = targetFrame(path);
     camera.position.set(c[0], c[1], c[2]);
     camera.up.fromArray(cameraUp(c));
     camera.lookAt(c[3], c[4], c[5]);
     camera.fov = c[6];
-    const p = ballAt(t, path);
+    const p = freestyle?.ballAt(lastTime) ?? ballAt(t, path);
     if (view === 'top') {
       camera.position.set(p[0], p[1] + 17, p[2] + .01);
       camera.up.set(0, 0, -1);
@@ -347,56 +376,47 @@ export function createScene(canvas: HTMLCanvasElement) {
     source.group.rotation.z = sourceAngleAt(t, path);
     ball.position.fromArray(p);
     ball.visible = reached(t,timing[path].release);
-    ball.rotation.set(t * 2, t * 1.7, t);
+    if (freestyle) ball.quaternion.copy(freestyle.rotationAt(lastTime));
+    else ball.rotation.set(t * 2, t * 1.7, t);
     // Ball radius is constant throughout the journey, including the impact.
-    const colored = reached(t,timing[path].pulseStart) && !reached(t,timing[path].pulseEnd);
+    const inTube = reached(t,timing[path].pulseStart) && !reached(t,timing[path].pulseEnd);
     // The source holds a dim entry pose for three left-route frames and two
     // right-route frames. Light rises as the unchanged sphere enters the wall.
     const entryGlow = smooth((t-timing[path].pulseStart-(path==='yes'?2:1)/30)*30);
-    const coilGlowRise = smooth((t-timing[path].pulseStart-2/30)*10);
-    ball.material = colored ? glowingBallMaterial : ballMaterial;
-    glowingBallMaterial.color.set(outcome === 'yes' ? '#65de83' : '#c63923')
-      .multiplyScalar(THREE.MathUtils.lerp(outcome==='yes'?.45:.85,radiance?2.2:1,entryGlow));
+    ball.material = inTube ? glowingBallMaterial : ballMaterial;
+    glowingBallMaterial.color.set('#ffc568')
+      .multiplyScalar(THREE.MathUtils.lerp(.7,radiance?1.8:1,entryGlow));
     ballMaterial.color.set('#ffffff');
     ballMaterial.emissive.set('#ffffff');
     // Keep the warm orange fill through the unlit flight, then leave the
     // luminous centre seen at impact. This remains the same full-radius,
     // depth-tested sphere, tangent to the plate after contact.
     ballMaterial.emissiveIntensity = .42 - .41*smooth((t-1.2)/.6) + .43*smooth((t-timing[path].pulseEnd)/.10) + .16*smooth((t-timing[path].hit)/.10);
+    if (freestyle) ballMaterial.emissiveIntensity = Math.max(.16,ballMaterial.emissiveIntensity);
     const surfaceRadiance = track(ballRadiance[path],t);
     for (let i=0; i<ballMaterial.userData.radiance.value.length; i++) ballMaterial.userData.radiance.value[i].fromArray(surfaceRadiance,i*3);
-    ballMaterial.userData.radianceAmount.value = 1-smooth((t-(timing[path].color-1/30))/(1/30));
+    ballMaterial.userData.radianceAmount.value = freestyle ? 0 : 1-smooth((t-(timing[path].color-1/30))/(1/30));
     pulse.position.fromArray(p);
-    pulse.color.set(outcome === 'yes' ? '#75ff48' : '#ff5130');
-    pulse.intensity = colored ? (outcome==='yes'?3.5:2.2) : 0;
+    pulse.color.set('#ffc568');
+    pulse.intensity = inTube ? 3 : 0;
     for (const branch of branches) {
       // The route and answer are fixed for the whole run, never frame masks.
       branch.group.visible = branch.outcome === path;
       // The answer belongs to the result phase. Before then its reflection
       // must not reveal a word beneath the distant target during the inlet shot.
       for (const answer of branch.answers) answer.mesh.visible = answer.result === outcome && reached(t,timing[path].color);
-      const pulseColor=outcome==='yes'?'#3fb748':'#cb3020';
-      const scatter=outcome==='yes'
-        ? [2.34375,4.25,5.625,13.971633] : [-.65625,4.53125,6.90625,11.016873];
-      branch.material.userData.pulseScatter.value.set(
-        side(path)*(TUBE.x+scatter[0]),scatter[1],TUBE.z+scatter[2],colored?scatter[3]*coilGlowRise:0);
-      if (colored) branch.material.color.set(pulseColor);
-      else branch.material.color.copy(coilNeutralColor);
-      branch.material.userData.neutralTint.value = colored ? 0 : 1;
-      if (colored) branch.material.emissive.set(pulseColor);
-      else branch.material.emissive.copy(coilNeutralEmission);
-      branch.material.emissiveIntensity = colored ? .018 + .12*smooth((t-timing[path].pulseStart-.20)/.30) : 1;
-      branch.material.shininess = colored ? (outcome==='yes'?300:70) : 260;
-      branch.material.specular.set(colored ? COLORS[outcome] : '#568966');
-      if(!colored) branch.material.specular.setRGB(.04,.04,.04);
-      if(colored) branch.material.specular.lerp(new THREE.Color('#8b8b8b'),.18).multiplyScalar(outcome==='yes'?.40:.65);
-      if(colored && outcome==='yes') branch.material.specular.set('#a9d7a1').multiplyScalar(.12);
-      // The neutral shell is denser than the luminous pulse in the film.
-      // Collision checks use the full solid wall independently of this material.
-      branch.material.opacity = opaque ? 1 : colored ? .70 : .82;
+      // Glass and travelling light never reveal the future answer. Only the
+      // target and lettering receive YES/NO colors after the actual impact.
+      branch.material.userData.pulseScatter.value.set(p[0],p[1],p[2],0);
+      branch.material.color.copy(coilNeutralColor);
+      branch.material.userData.neutralTint.value = 1;
+      branch.material.emissive.copy(coilNeutralEmission);
+      branch.material.emissiveIntensity = 1;
+      branch.material.shininess = 260;
+      branch.material.specular.setRGB(.04,.04,.04);
+      branch.material.opacity = opaque ? 1 : .82;
       branch.material.depthWrite = opaque;
-      branch.material.blending = opaque ? THREE.NoBlending : colored ? THREE.CustomBlending : THREE.NormalBlending;
-      branch.material.blendColor.setRGB(outcome === 'yes' ? .15 : .30, outcome === 'yes' ? .30 : .16, .10);
+      branch.material.blending = opaque ? THREE.NoBlending : THREE.NormalBlending;
       const coloredTarget=reached(t,timing[path].color);
       // Only the left route has a blue precolor frame; the right route keeps
       // its violet plate in both held frames before the red result.
@@ -433,7 +453,8 @@ export function createScene(canvas: HTMLCanvasElement) {
       branch.target.bevel.emissiveIntensity=coloredTarget?.012:.020;
       branch.target.group.rotation.z = targetAngleAt(t,path);
       for (const pin of branch.pins) { pin.material.color.set(COLORS.cyan); pin.material.emissive.set('#254c8e'); pin.material.specular.set('#528fc0'); pin.material.userData.colored.value=0; }
-      for (const [change, index, color] of pinColorEvents[branch.outcome]) if (reached(t,change)) {
+      const pinEvents = freestyle ? freestyle.contacts.map(c => [c.time,c.index,c.color] as const) : pinColorEvents[branch.outcome];
+      for (const [change, index, color] of pinEvents) if (reached(freestyle ? lastTime : t,change)) {
         branch.pins[index].material.color.set(COLORS[color]);
         branch.pins[index].material.userData.colored.value=1;
         branch.pins[index].material.emissive.set(color === 'yes' ? '#062705' : '#300502');
@@ -483,11 +504,10 @@ export function createScene(canvas: HTMLCanvasElement) {
     mirror.uniforms.glow.value.set(pool.position.x, pool.position.z);
     mirror.uniforms.coilGlow.value.set(side(path)*TUBE.x,TUBE.z);
     mirror.uniforms.coilFloorLight.value = smooth((t-timing[path].pulseStart-.10)/.25);
-    const greenCoilLight=colored&&outcome==='yes';
     // A side lamp leaves the inlet face blue while lighting the far-facing
     // upper turns pink after the orbit. The position is a reconstruction
     // from these views; it stays in world space rather than following camera.
-    coilLight.position.set(side(path)*(TUBE.x+(greenCoilLight?-1.8:18)),greenCoilLight?4.4:11,TUBE.z+(greenCoilLight?7.96:7));
+    coilLight.position.set(side(path)*(TUBE.x+18),11,TUBE.z+7);
     coilNeutral.position.copy(coilLight.position);
     coilNeutral.target.position.set(side(path)*TUBE.x,TUBE.y+TUBE.rise/2,TUBE.z);
     coilNeutral.target.updateMatrixWorld();
@@ -524,11 +544,10 @@ export function createScene(canvas: HTMLCanvasElement) {
     targetLamp.position.fromArray(add(add(f.center,mul(f.up,targetLampHeight)),mul(f.normal,targetLampDistance)));
     targetLamp.target.position.fromArray(add(f.center,mul(f.up,targetLampHeight)));
     targetLamp.target.updateMatrixWorld();
-    const coilEntryLight=THREE.MathUtils.lerp(.2,1,coilGlowRise);
-    coilLight.intensity=colored&&!greenCoilLight?300*(1-finishMix)*coilEntryLight:0;
-    coilNeutral.intensity=colored?0:300*(1-finishMix);
-    coilPulse.intensity=greenCoilLight?22*(1-finishMix)*coilEntryLight:0;
-    coilBlue.intensity=colored ? 0 : .5*smooth((t-1.8)/.3)*(1-finishMix);
+    coilLight.intensity=0;
+    coilNeutral.intensity=300*(1-finishMix);
+    coilPulse.intensity=0;
+    coilBlue.intensity=.5*smooth((t-1.8)/.3)*(1-finishMix);
     targetLamp.intensity=(reached(t,timing[path].color)?60:114.356012)*finishMix*(1-reveal);
     targetEdgeLamp.position.fromArray(add(f.center,mul(f.up,10)));
     targetEdgeLamp.target.position.fromArray(f.center);
@@ -563,7 +582,7 @@ export function createScene(canvas: HTMLCanvasElement) {
     const reflectionWidth = Math.min(768, Math.max(256, Math.round(size.x * .66)));
     floor.getRenderTarget().setSize(reflectionWidth, Math.round(reflectionWidth * 2 / 3));
     camera.aspect = 1241 / 688;
-    if (draw) render(lastTime, lastOutcome, lastScenario, lastView, lastOpaque);
+    if (draw) render(lastTime, lastOutcome, lastScenario, lastView, lastOpaque, lastFreestyle);
   };
   const observer = new ResizeObserver(() => resize());
   observer.observe(canvas);
@@ -590,6 +609,7 @@ export function createScene(canvas: HTMLCanvasElement) {
       // One of these is detached from the mesh at any particular frame.
       materials.add(ballMaterial);
       materials.add(glowingBallMaterial);
+      materials.add(guideMaterial);
       materials.forEach(m => m.dispose());
       texture.dispose();
       renderer.dispose();
