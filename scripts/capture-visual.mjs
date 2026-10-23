@@ -8,6 +8,7 @@ try {
   const page = await browser.newPage({ viewport: { width: 1000, height: 1100 } });
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
+  page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
   const states = [];
   for (const outcome of ['yes', 'no']) {
     await page.goto(`http://127.0.0.1:4175/?review=1&outcome=${outcome}&t=0`);

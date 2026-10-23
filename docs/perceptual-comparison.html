@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="ru">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width">
+<title>Major Decision — фильм / до / после</title>
+<style>
+body{margin:24px;background:#101726;color:#dce5f4;font:16px/1.5 system-ui}main{max-width:1920px;margin:auto}a{color:#b5caff}button,select,input{font:inherit;margin:5px}button[aria-pressed=true]{background:#c3dfbe}.movies{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}figure{margin:0}video,img{width:100%;background:#000}label{white-space:nowrap}.stills{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}figcaption{margin:5px 0}#error{color:#ffab93}@media(max-width:850px){.movies,.stills{grid-template-columns:1fr}}
+</style>
+<main>
+<h1>Фильм / до / после</h1>
+<p>Завершённый визуальный проход, вариант 56a. «До» — фактически выпущенное в начале прохода приложение bee1d41. Сведены композиция и ритм двух веток, веер, облёт спирали, свет, отражения и корпус; последний проход уточнил синий материал штырей и тёплый свет пола под спиралью. По кадровой оценке обе ветки соответствуют согласованному good enough. Метод и оставшиеся мелкие отличия перечислены ниже; геометрические проверки отдельно защищают полный объём шара.</p>
+<p><a href="PERCEPTUAL_REVIEW.md">Наблюдения и ограничения</a> · <a href="HANDOFF.md">Статус проверок и выпуска</a> · <a href="visual-comparison.html">Итоговый пакет и крупные сравнения</a></p>
+<div><button data-movie="yes" aria-pressed="true">YES · LEFT</button><button data-movie="no" aria-pressed="false">NO · RIGHT</button></div>
+<div><button id="play-movies">PLAY / RESTART</button><button id="pause-movies">PAUSE</button><button id="resume-movies">RESUME</button><label>Скорость <select id="movie-speed"><option value="1">1×</option><option value="0.25">¼×</option></select></label><label>Время <input id="movie-time" type="range" min="0" max="6.9" step="any" value="0"></label><output id="timecode">0.00 s</output></div>
+<div class="movies">
+<figure><figcaption>Фильм · постоянная коррекция перспективы</figcaption><video id="film" controls muted playsinline preload="metadata"></video></figure>
+<figure><figcaption>До · исходная версия этого прохода</figcaption><video id="before" controls muted playsinline preload="metadata"></video></figure>
+<figure><figcaption>Вариант 56a · точные 30 кадров/с таймлайна</figcaption><video id="after" controls muted playsinline preload="metadata"></video></figure>
+</div>
+<p>Полное сравнение: <a id="triple">скачать фильм / до / вариант 56a</a>. Полная текущая последовательность: <a id="single">скачать</a>. Скорость всех колонок — 1×; ноль фильма: YES 173/30 с, NO 188/30 с. Перспектива снятого монитора исправлена одной матрицей на ролик. Скрытый низ экрана и искажения CRT не восстанавливались.</p>
+<p>Это детерминированный экспорт, а не измерение FPS устройства. На паузе и при увеличении различаются отдельные блики и профиль горловин, фактура шара, кромки букв и иконок; у фильма остаются CRT-искажения. Просмотрены все шесть листов полных сравнений и все 832 кадра четырёх сочетаний маршрута/ответа. Отдельное браузерное воспроизведение 1× прошло без ошибок. Прямого видеоплеера у агента нет: визуальная оценка сделана по кадрам, а технический playback проверен отдельно. Актуальный статус публикации — в HANDOFF.</p><p id="error" role="alert"></p>
+</main>
+<script>
+const root='../references/review/2026-10-21-perceptual/';
+const iteration=root+'iterations/56a/';
+const videos=[...document.querySelectorAll('video')], slider=document.querySelector('#movie-time');
+const pause=()=>videos.forEach(v=>v.pause());
+const play=()=>Promise.all(videos.map(v=>v.play())).catch(e=>document.querySelector('#error').textContent=e.message);
+function select(branch){pause();document.body.dataset.ready=branch;document.querySelector('#error').textContent='';slider.value=0;document.querySelector('#timecode').textContent='0.00 s';
+for(const v of videos){v.src=(v.id==='after'?iteration:root)+v.id+'-'+branch+'.mp4';v.load();v.playbackRate=Number(document.querySelector('#movie-speed').value)}
+for(const button of document.querySelectorAll('[data-movie]'))button.setAttribute('aria-pressed',String(button.dataset.movie===branch));
+document.querySelector('#triple').href=iteration+'compare-'+branch+'.mp4';document.querySelector('#single').href=iteration+'after-'+branch+'.mp4';}
+for(const button of document.querySelectorAll('[data-movie]'))button.onclick=()=>select(button.dataset.movie);
+document.querySelector('#play-movies').onclick=()=>{videos.forEach(v=>v.currentTime=0);play()};
+document.querySelector('#resume-movies').onclick=play;document.querySelector('#pause-movies').onclick=pause;
+slider.oninput=()=>{pause();videos.forEach(v=>v.currentTime=Number(slider.value));document.querySelector('#timecode').textContent=Number(slider.value).toFixed(2)+' s'};
+document.querySelector('#movie-speed').onchange=e=>videos.forEach(v=>v.playbackRate=Number(e.target.value));
+for(const v of videos)v.onerror=()=>document.querySelector('#error').textContent='Не удалось загрузить '+v.src;
+videos[2].ontimeupdate=()=>{if(!videos[2].paused){slider.value=Math.min(videos[2].currentTime,6.9);document.querySelector('#timecode').textContent=videos[2].currentTime.toFixed(2)+' s'}};
+select('yes');
+</script>
+</html>

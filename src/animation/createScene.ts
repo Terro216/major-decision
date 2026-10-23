@@ -4,20 +4,29 @@ import { Reflector } from 'three/addons/objects/Reflector.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { answerLetters, answerPaths } from '../answerPaths';
 import { pathFor, type Scenario } from './scenario';
-import { ballAt, cameraAt, cameraUp, clamp, DURATION, pinContacts, smooth, timing } from './timeline';
-import { add, BALL_RADIUS, fields, mix, mul, PIN_HEIGHT, PIN_RADIUS, side, sourcePosition, TARGET, TUBE, targetFrame, tubePoint, tubeTangent, type Outcome } from './mechanism';
+import { ballAt, cameraAt, cameraUp, clamp, DURATION, pinColorEvents, reached, revealRise, smooth, sourceAngleAt, targetAngleAt, timing, track } from './timeline';
+import { add, BALL_RADIUS, fields, mix, mul, PIN_HEIGHT, PIN_RADIUS, side, SOURCE_SCALE, sourcePosition, STAR_RING, TARGET, TUBE, targetFrame, tubePoint, tubeTangent, type Outcome } from './mechanism';
 import { tubeGeometry, wallSorter } from './tubeGeometry';
-import { answerSurface, pinSurface, starSurface, tubeSurface } from './surfaces';
-import { backdropGLSL, createBackdrop } from './backdrop';
+import { answerSurface, ballSurface, pinSurface, starEdgeSurface, starSurface, tubeSurface } from './surfaces';
+import { ballRadiance } from './ballRadiance';
+import { backdropGLSL, createBackdrop, openingFloorEdge } from './backdrop';
 export type ReviewView = 'film' | 'top' | 'side' | 'mouth';
-const COLORS = { yes: '#37bc25', no: '#dc2814', purple: '#b660d0', cyan: '#4bd4fb' };
+const COLORS = { yes: '#37bc25', no: '#dc2814', purple: '#b660d0', cyan: '#65aaee' };
 
 function createStar(violetCentre = true) {
   const group = new THREE.Group();
   const material = starSurface(violetCentre);
-  const bevel = new THREE.MeshPhongMaterial({color: '#763d8b',emissive:'#763d8b',emissiveIntensity:.06,specular:'#747494',shininess:45});
-  const triangle = new THREE.Shape().moveTo(-.51, 1.68).lineTo(.51, 1.68).lineTo(0, 2.91).closePath();
-  const geometry = new THREE.ExtrudeGeometry(triangle, { depth: .10, bevelEnabled: true, bevelThickness: .06, bevelSize: .065, bevelSegments: 2 });
+  const bevel = starEdgeSurface();
+  // Invert Three.js's sqrt(2)-limited corner offsets to narrow the bevel
+  // without moving any outer triangle vertex. A plain line offset grows tips.
+  const [bevelSize,half,base,tip]=violetCentre
+    ? [.035,.5452101565862036,1.6563298759110106,2.952426406871193]
+    : [.065,.51,1.68,2.91];
+  const triangle = new THREE.Shape().moveTo(-half,base).lineTo(half,base).lineTo(0,tip).closePath();
+  // Keep the bevel angle and both axial bounds as its width narrows.
+  const bevelThickness=.06*bevelSize/.065;
+  const geometry = new THREE.ExtrudeGeometry(triangle, { depth: .22-2*bevelThickness, bevelEnabled: true, bevelThickness, bevelSize, bevelSegments: 2 });
+  geometry.translate(0,0,bevelThickness-.06);
   for (let i = 0; i < 8; i++) {
     const ray = new THREE.Mesh(geometry, [material,bevel]);
     ray.rotation.z = i * Math.PI / 4;
@@ -30,24 +39,33 @@ function createStar(violetCentre = true) {
   disc.rotateX(Math.PI/2);
   const plate = new THREE.Mesh(disc, material);
   group.add(plate);
-  const ring = new THREE.Mesh(new THREE.TorusGeometry(.62, .035, 12, 64), material);
-  ring.position.z = .21;
+  const ringMaterial = violetCentre
+    ? new THREE.MeshPhongMaterial({color:'#b660d0',emissive:'#b660d0',emissiveIntensity:.04,specular:'#514665',shininess:70})
+    : material;
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(STAR_RING.radius, STAR_RING.radial, 16, 64), ringMaterial);
+  ring.scale.z=STAR_RING.axial/STAR_RING.radial;
+  ring.position.z = STAR_RING.z;
   group.add(ring);
-  return { group, material, bevel };
+  return { group, material, bevel, ringMaterial };
 }
 
 function createAnswer(outcome: Outcome) {
   const group = new THREE.Group();
   const loader = new SVGLoader();
-  const front = answerSurface(outcome === 'yes' ? '#27c02b' : '#dc2c19');
-  const edge = answerSurface(outcome === 'yes' ? '#39a925' : '#b52917', true);
+  // Reconstruct the painted fronts and lamp from flat interior patches in
+  // the two endings; the polished bevel remains a separate real surface.
+  const front = answerSurface(outcome === 'yes' ? '#27832d' : '#841808');
+  const frontSpecular = outcome === 'yes' ? .000437122 : .004406102;
+  front.specular.setRGB(frontSpecular,frontSpecular,frontSpecular);
+  const edge = answerSurface(outcome === 'yes' ? '#328526' : '#961d0b', true);
+  if (outcome === 'no') edge.specular.set('#181818');
   const width = outcome === 'yes' ? 320 : 226;
-  for (const { letter, x } of answerLetters[outcome]) {
+  for (const { letter, x, y, sx, sy } of answerLetters[outcome]) {
     const data = loader.parse(`<svg xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="${answerPaths[letter]}"/></svg>`);
     for (const shape of SVGLoader.createShapes(data.paths[0])) {
       const geometry = new THREE.ExtrudeGeometry(shape, { depth: 12, bevelEnabled: true, bevelSize: 2.0, bevelThickness: 2.0, bevelSegments: 2, curveSegments: 24 });
-      geometry.scale(.035, -.035, -.035);
-      geometry.translate((x - width / 2) * .035, 1.82, 0);
+      geometry.scale(.035*sx, -.035*sy, -.035);
+      geometry.translate((x - width / 2) * .035, 1.82-y*.035, 0);
       group.add(new THREE.Mesh(geometry, [front, edge]));
     }
   }
@@ -81,10 +99,11 @@ function orangeTexture() {
     // Sample the cloud in spherical coordinates so the UV seam and poles do
     // not make the diagonal bands visible in the previous close-up.
     const cloud = .65*noise(sx*4+3,sy*4+7,sz*4-2)+.30*noise(sx*9-3,sy*9+1,sz*9+6)+.15*noise(sx*19+8,sy*19-3,sz*19+4);
+    const mottle = Math.max(0,noise(sx*2.4-4,sy*2.4+2,sz*2.4+9));
     const i = (y * 256 + x) * 4;
-    pixels.data[i] = 218 + cloud * 40 + grain;
-    pixels.data[i + 1] = 127 + cloud * 47 + grain;
-    pixels.data[i + 2] = 40 + cloud * 17 + grain*.4;
+    pixels.data[i] = 225 + cloud * 25 - mottle * 32 + grain;
+    pixels.data[i + 1] = 145 + cloud * 28 - mottle * 20 + grain;
+    pixels.data[i + 2] = 50 + cloud * 16 - mottle * 7 + grain*.4;
     pixels.data[i + 3] = 255;
   }
   ctx.putImageData(pixels, 0, 0);
@@ -112,7 +131,7 @@ export function createScene(canvas: HTMLCanvasElement) {
   const camera = new THREE.PerspectiveCamera(40, 1241 / 688, .1, 2000);
   const ambient = new THREE.AmbientLight('#a59be0', .14);
   const key = new THREE.DirectionalLight('#fff0ef', 2.5);
-  key.position.set(-5, 18, -6);
+  key.position.set(-5, 12, -12);
   const fill = new THREE.DirectionalLight('#5670ff', 1.0);
   fill.position.set(9, 3, -10);
   const finalLight = new THREE.PointLight('#ffffff', 80, 40, 2);
@@ -123,35 +142,114 @@ export function createScene(canvas: HTMLCanvasElement) {
 
   const floor = new Reflector(new THREE.PlaneGeometry(10000, 10000), { color: 0x6779ad, textureWidth: 768, textureHeight: 512, clipBias: .003, multisample: 0 });
   if (!radiance) floor.getRenderTarget().texture.type = THREE.UnsignedByteType;
+  floor.getRenderTarget().texture.generateMipmaps = true;
+  floor.getRenderTarget().texture.minFilter = THREE.LinearMipmapLinearFilter;
   // One reflecting surface also carries its substrate and light pool. Keeping
   // these in one shader avoids coplanar depth stripes at grazing camera angles.
   const mirror = floor.material as THREE.ShaderMaterial;
   mirror.uniforms.glow = { value: new THREE.Vector2(-1,-5) };
+  mirror.uniforms.coilGlow = { value: new THREE.Vector2(TUBE.x,TUBE.z) };
+  mirror.uniforms.coilFloorLight = { value: 0 };
   mirror.uniforms.finish = { value: 0 };
+  mirror.uniforms.openingCut = { value: 1 };
+  mirror.uniforms.openingLight = { value: 1 };
+  mirror.uniforms.openingPoolStrength = { value: .60 };
+  mirror.uniforms.openingBoundary = { value: new THREE.Vector2(-41,0) };
+  mirror.uniforms.farShade = { value: 0 };
+  mirror.uniforms.flightDark = backdrop.material.uniforms.flightDark;
+  mirror.uniforms.lightBoundary = { value: new THREE.Vector4(0,-7.46,0,.2) };
+  mirror.uniforms.latePanelColor = { value: 0 };
+  mirror.uniforms.routeSide = { value: 1 };
   mirror.uniforms.reveal = backdrop.material.uniforms.reveal;
   mirror.uniforms.resolution = { value: new THREE.Vector2(1,1) };
+  mirror.uniforms.reflectionLod = { value: 4.0 };
   mirror.vertexShader = mirror.vertexShader.replace('varying vec4 vUv;', 'varying vec4 vUv; varying vec3 floorView; varying vec3 floorWorld;').replace('vUv = textureMatrix', 'floorView = (modelViewMatrix * vec4(position,1.)).xyz; floorWorld = (modelMatrix * vec4(position,1.)).xyz; vUv = textureMatrix');
-  mirror.fragmentShader = mirror.fragmentShader.replace('varying vec4 vUv;', `varying vec4 vUv; varying vec3 floorView; varying vec3 floorWorld; uniform vec2 glow; uniform vec2 resolution; uniform float finish; uniform float reveal; ${backdropGLSL}`).replace('gl_FragColor = vec4( blendOverlay( base.rgb, color ), 1.0 );', `
+  // A rough reflecting floor softens the actual reflected scene. It does not
+  // substitute a second star, remove objects or change the glass/sphere.
+  mirror.fragmentShader = mirror.fragmentShader.replace('vec4 base = texture2DProj( tDiffuse, vUv );', `
+    vec2 reflectionUV = vUv.xy / vUv.w;
+    vec4 base = texture2DLodEXT(tDiffuse,reflectionUV,reflectionLod);
+  `);
+  mirror.fragmentShader = mirror.fragmentShader.replace('varying vec4 vUv;', `varying vec4 vUv; varying vec3 floorView; varying vec3 floorWorld; uniform vec2 glow; uniform vec2 coilGlow; uniform float coilFloorLight; uniform vec2 resolution; uniform float reflectionLod; uniform float finish; uniform float reveal; uniform float openingCut; uniform float openingLight; uniform float openingPoolStrength; uniform vec2 openingBoundary; uniform float farShade; uniform vec4 lightBoundary; uniform float latePanelColor; uniform float routeSide; ${backdropGLSL}`).replace('gl_FragColor = vec4( blendOverlay( base.rgb, color ), 1.0 );', `
     vec2 delta = floorWorld.xz - glow;
-    float pool = exp(-dot(delta,delta)/22.);
-    float wash = .5+.5*sin(floorWorld.x*.13+floorWorld.z*.09);
-    vec3 substrate = vec3(.035,.027,.46)+wash*vec3(.014,.008,.055)+pool*vec3(.67,.29,.79);
-    vec3 radiance = mix(substrate,blendOverlay(base.rgb,color),.50);
-    vec3 horizon = backdrop(gl_FragCoord.xy/resolution,finish,reveal);
-    gl_FragColor = vec4(mix(horizon,radiance,exp(-length(floorView)/mix(160.,10.,finish))),1.);
+    vec2 poolWidth = mix(vec2(4.5,4.5/.22),vec2(2.85*2.85,6.1*6.1),openingLight);
+    float pool = exp(-dot(delta*delta,1./poolWidth));
+    float poolCore = exp(-delta.x*delta.x/(1.5*1.5)-delta.y*delta.y/(3.75*3.75))*openingLight;
+    vec2 coilDelta = floorWorld.xz-coilGlow;
+    float coilPool = exp(-dot(coilDelta,coilDelta)/120.);
+    float edge = 1.-smoothstep(lightBoundary.x-.035,lightBoundary.x+.035,floorWorld.z);
+    float corner = 1.-lightBoundary.z*smoothstep(lightBoundary.y-.035,lightBoundary.y+.035,routeSide*floorWorld.x+floorWorld.z);
+    float panel = edge*corner*lightBoundary.w;
+    float warm = smoothstep(-6.,3.,routeSide*floorWorld.x);
+    float poolPanel = edge*corner*openingPoolStrength;
+    vec3 panelColor = mix(vec3(.008+.05*warm,.008+.025*warm,.13+.15*warm),
+      vec3(.143620,.105083,.230267)+vec3(.041430,-.009799,-.008534)*clamp(floorWorld.x,-2.,5.),latePanelColor);
+    vec3 substrate = mix(vec3(.010,.008,.145),vec3(.010,.008,.195),(routeSide+1.)*.5)+panel*panelColor+poolPanel*(pool*mix(vec3(.50,.23,.65),vec3(.741582,.305187,.731300),openingLight)+poolCore*vec3(.279249,.456447,0.));
+    // One fixed mirrored light pool beneath the coil, reconstructed from
+    // clear floor samples in both clips. It rises after entry, independently
+    // of the answer color, and illuminates the actual reflecting surface.
+    vec2 localPoolDelta = vec2(routeSide*floorWorld.x,floorWorld.z)-vec2(6.5,-2.5);
+    float localPool = exp(-dot(localPoolDelta,localPoolDelta)/12.25);
+    substrate += localPool*vec3(.526258,.329015,.281640)*coilFloorLight;
+    vec3 radiance = substrate + base.rgb*.52 + coilPool*vec3(.065,.030,.28);
+    vec3 horizon = backdrop(gl_FragCoord.xy/resolution,finish,reveal,routeSide);
+    // The final approach reveals a hard dark region with a fixed world-space
+    // boundary. Its lighting transition is inferred from source frames;
+    // neither the floor geometry nor the camera follows the ball's silhouette.
+    float farEdge = 1.-farShade*smoothstep(50.169273,50.269273,routeSide*floorWorld.x-.461612929*floorWorld.z);
+    float farLightWidth = mix(.05,.9,openingLight);
+    float farLight = smoothstep(openingBoundary.x-farLightWidth,openingBoundary.x+farLightWidth,
+      floorWorld.z-openingBoundary.y*floorWorld.x);
+    gl_FragColor = vec4(mix(horizon,radiance,(1.-finish)*farEdge*exp(-length(floorView)/mix(100.,10.,finish))*(1.-openingCut*(1.-farLight))),1.);
   `);
   floor.rotation.x = -Math.PI / 2;
   world.add(floor);
-  const pool = new THREE.PointLight('#e59ce9', 1.8, 24, 1.8);
+  const pool = new THREE.PointLight('#e59ce9', .6, 24, 1.8);
   pool.position.set(-1, 3, -5);
   world.add(pool);
 
   const source = createStar(false);
-  source.material.emissiveIntensity=.70;
+  source.group.scale.setScalar(SOURCE_SCALE);
+  source.material.color.set('#bd4dc2').multiplyScalar(.15);
+  source.material.emissive.set('#bd4dc2');
+  source.material.emissiveIntensity=.90;
+  source.material.specular.set('#b2b7c5');
+  source.material.shininess=110;
+  source.bevel.color.set('#9f6aae');
+  source.bevel.emissive.set('#a45fd5');
+  source.bevel.emissiveIntensity=.50;
+  source.bevel.specular.set('#b2c3d4');
+  source.bevel.shininess=60;
+  // One local lamp produces both the outer plate and inner ring glints.
+  const sourceLamp=new THREE.PointLight('#fff4fb',30,30,2);
+  world.add(sourceLamp);
+  const coilLight = new THREE.PointLight('#ffffff',140,50,2);
+  // The neutral glass has white glints over its magenta body. Keep that
+  // lamp local to the coil so it does not recolour the distant target.
+  const coilNeutral = new THREE.SpotLight('#ffffff',0,50,.70,.35,2);
+  const coilNeutralColor = new THREE.Color('#e294ee').multiply(new THREE.Color(.7,.9,.5));
+  const coilNeutralEmission = new THREE.Color('#32164a').multiply(new THREE.Color(2.4,3,2.4));
+  world.add(coilNeutral,coilNeutral.target);
+  const coilPulse = new THREE.SpotLight('#ffffff',0,30,.75,.9,2);
+  world.add(coilPulse,coilPulse.target);
+  world.add(coilLight);
+  const coilBlue = new THREE.DirectionalLight('#2144ff', 0);
+  world.add(coilBlue, coilBlue.target);
+  // The outer pin rows and their floor patch are brighter in the inlet
+  // views. A fixed local lamp reaches these stems without flattening the
+  // opening field or lighting the upper coil from the camera.
+  const pinFill = new THREE.SpotLight('#f6eaff',100,18,.60,.65,2);
+  world.add(pinFill,pinFill.target);
   source.group.position.fromArray(sourcePosition('yes'));
   world.add(source.group);
   const targetLamp = new THREE.SpotLight('#ffffff',140,40,.80,.8,2);
   world.add(targetLamp,targetLamp.target);
+  // Light parallel to the plate reaches its bevels without filling the
+  // shadowed front faces of the lower rays.
+  const targetEdgeLamp=new THREE.DirectionalLight('#ffffff',1.8);
+  world.add(targetEdgeLamp,targetEdgeLamp.target);
+  const targetBlue = new THREE.SpotLight('#244dff',12,25,.494403,.157272,2);
+  world.add(targetBlue,targetBlue.target);
 
   const pinGeometry = new THREE.LatheGeometry([[0,0],[.115,0],[PIN_RADIUS,.03],[PIN_RADIUS,PIN_HEIGHT-.035],[.11,PIN_HEIGHT],[0,PIN_HEIGHT]].map(([r,y])=>new THREE.Vector2(r,y-PIN_HEIGHT/2)),24);
   // Bands sit on, never outside, the shared collision radius.
@@ -159,6 +257,8 @@ export function createScene(canvas: HTMLCanvasElement) {
     const group = new THREE.Group();
     const pins = fields[outcome].pins.map(pin => {
       const material = pinSurface();
+      const openingLight = sourcePosition(outcome);
+      material.userData.sourceLight.value.set(openingLight[0],4,openingLight[2]+1);
       const mesh = new THREE.Group();
       const body = new THREE.Mesh(pinGeometry, material);
       body.position.y = PIN_HEIGHT / 2;
@@ -179,6 +279,9 @@ export function createScene(canvas: HTMLCanvasElement) {
     const frame = targetFrame(outcome);
     const basis = new THREE.Matrix4().makeBasis(new THREE.Vector3(...frame.right), new THREE.Vector3(...frame.up), new THREE.Vector3(...frame.normal));
     const target = createStar();
+    target.material.userData.lightFrame.value.copy(basis)
+      .scale(new THREE.Vector3(TARGET.scale,TARGET.scale,TARGET.scale))
+      .setPosition(...frame.center).invert();
     const targetMount = new THREE.Group();
     targetMount.position.fromArray(frame.center);
     targetMount.quaternion.setFromRotationMatrix(basis);
@@ -189,8 +292,10 @@ export function createScene(canvas: HTMLCanvasElement) {
     // target. Neither the ball nor the target is swapped, scaled or teleported.
     const answers = (['yes', 'no'] as const).map(result => {
       const mesh = createAnswer(result);
-      mesh.position.set(-.10, 13.05, 0);
-      mesh.scale.setScalar(1.65);
+      // Same final framing as the old 18-unit camera, now at a fixed 11-unit
+      // depth throughout the reveal. The letters no longer shrink on entry.
+      mesh.position.set(-.10*11/18, 9.7+.55*11/18, 0);
+      mesh.scale.setScalar(1.65*11/18);
       targetMount.add(mesh);
       return { result, mesh };
     });
@@ -198,7 +303,7 @@ export function createScene(canvas: HTMLCanvasElement) {
     return { outcome, group, pins, tube, material, target, targetMount, answers };
   });
   const texture = orangeTexture();
-  const ballMaterial = new THREE.MeshPhongMaterial({ map: texture, emissiveMap: texture, specular: '#6a4d26', shininess: 18 });
+  const ballMaterial = ballSurface(texture);
   // A luminous sphere during the pulse, as in the reference. Multiplying its
   // green emission by the orange albedo suppressed it inside the real wall.
   // The mesh, depth test, radius and wall opacity are identical in both states.
@@ -239,71 +344,209 @@ export function createScene(canvas: HTMLCanvasElement) {
     }
     camera.updateProjectionMatrix();
     source.group.position.fromArray(sourcePosition(path));
-    source.group.rotation.z = -2.6 * (t - .4);
+    source.group.rotation.z = sourceAngleAt(t, path);
     ball.position.fromArray(p);
-    ball.visible = t >= timing[path].release;
+    ball.visible = reached(t,timing[path].release);
     ball.rotation.set(t * 2, t * 1.7, t);
     // Ball radius is constant throughout the journey, including the impact.
-    const colored = t >= timing[path].entry && t < timing[path].exit;
+    const colored = reached(t,timing[path].pulseStart) && !reached(t,timing[path].pulseEnd);
+    // The source holds a dim entry pose for three left-route frames and two
+    // right-route frames. Light rises as the unchanged sphere enters the wall.
+    const entryGlow = smooth((t-timing[path].pulseStart-(path==='yes'?2:1)/30)*30);
+    const coilGlowRise = smooth((t-timing[path].pulseStart-2/30)*10);
     ball.material = colored ? glowingBallMaterial : ballMaterial;
-    glowingBallMaterial.color.set(outcome === 'yes' ? '#8fff4d' : '#ff3923').multiplyScalar(radiance ? 2.2 : 1);
+    glowingBallMaterial.color.set(outcome === 'yes' ? '#65de83' : '#c63923')
+      .multiplyScalar(THREE.MathUtils.lerp(outcome==='yes'?.45:.85,radiance?2.2:1,entryGlow));
     ballMaterial.color.set('#ffffff');
     ballMaterial.emissive.set('#ffffff');
     // Keep the warm orange fill through the unlit flight, then leave the
     // luminous centre seen at impact. This remains the same full-radius,
     // depth-tested sphere, tangent to the plate after contact.
-    ballMaterial.emissiveIntensity = .16 + .25*smooth((t-timing[path].exit)/.10) + .35*smooth((t-TARGET.hit)/.10);
+    ballMaterial.emissiveIntensity = .42 - .41*smooth((t-1.2)/.6) + .43*smooth((t-timing[path].pulseEnd)/.10) + .16*smooth((t-timing[path].hit)/.10);
+    const surfaceRadiance = track(ballRadiance[path],t);
+    for (let i=0; i<ballMaterial.userData.radiance.value.length; i++) ballMaterial.userData.radiance.value[i].fromArray(surfaceRadiance,i*3);
+    ballMaterial.userData.radianceAmount.value = 1-smooth((t-(timing[path].color-1/30))/(1/30));
     pulse.position.fromArray(p);
     pulse.color.set(outcome === 'yes' ? '#75ff48' : '#ff5130');
-    pulse.intensity = colored ? 3.5 : 0;
+    pulse.intensity = colored ? (outcome==='yes'?3.5:2.2) : 0;
     for (const branch of branches) {
       // The route and answer are fixed for the whole run, never frame masks.
       branch.group.visible = branch.outcome === path;
-      for (const answer of branch.answers) answer.mesh.visible = answer.result === outcome;
-      branch.material.color.set(colored ? COLORS[outcome] : '#c26bd3');
-      branch.material.emissive.set(colored ? COLORS[outcome] : '#07010e');
-      branch.material.emissiveIntensity = colored ? .012 : 1;
-      // The film's colored pulse still reveals the travelling ball. Keep the
-      // same glass opacity through the pulse; geometry also passes opaque review.
-      branch.material.opacity = opaque ? 1 : .70;
+      // The answer belongs to the result phase. Before then its reflection
+      // must not reveal a word beneath the distant target during the inlet shot.
+      for (const answer of branch.answers) answer.mesh.visible = answer.result === outcome && reached(t,timing[path].color);
+      const pulseColor=outcome==='yes'?'#3fb748':'#cb3020';
+      const scatter=outcome==='yes'
+        ? [2.34375,4.25,5.625,13.971633] : [-.65625,4.53125,6.90625,11.016873];
+      branch.material.userData.pulseScatter.value.set(
+        side(path)*(TUBE.x+scatter[0]),scatter[1],TUBE.z+scatter[2],colored?scatter[3]*coilGlowRise:0);
+      if (colored) branch.material.color.set(pulseColor);
+      else branch.material.color.copy(coilNeutralColor);
+      branch.material.userData.neutralTint.value = colored ? 0 : 1;
+      if (colored) branch.material.emissive.set(pulseColor);
+      else branch.material.emissive.copy(coilNeutralEmission);
+      branch.material.emissiveIntensity = colored ? .018 + .12*smooth((t-timing[path].pulseStart-.20)/.30) : 1;
+      branch.material.shininess = colored ? (outcome==='yes'?300:70) : 260;
+      branch.material.specular.set(colored ? COLORS[outcome] : '#568966');
+      if(!colored) branch.material.specular.setRGB(.04,.04,.04);
+      if(colored) branch.material.specular.lerp(new THREE.Color('#8b8b8b'),.18).multiplyScalar(outcome==='yes'?.40:.65);
+      if(colored && outcome==='yes') branch.material.specular.set('#a9d7a1').multiplyScalar(.12);
+      // The neutral shell is denser than the luminous pulse in the film.
+      // Collision checks use the full solid wall independently of this material.
+      branch.material.opacity = opaque ? 1 : colored ? .70 : .82;
       branch.material.depthWrite = opaque;
-      branch.target.material.color.set(t >= TARGET.color ? COLORS[outcome] : COLORS.purple);
-      const flash=Math.exp(-(((t-5.865)/.025)**2));
+      branch.material.blending = opaque ? THREE.NoBlending : colored ? THREE.CustomBlending : THREE.NormalBlending;
+      branch.material.blendColor.setRGB(outcome === 'yes' ? .15 : .30, outcome === 'yes' ? .30 : .16, .10);
+      const coloredTarget=reached(t,timing[path].color);
+      // Only the left route has a blue precolor frame; the right route keeps
+      // its violet plate in both held frames before the red result.
+      const flash=coloredTarget||path==='no'?0:Math.exp(-(((t-(timing[path].color-1/30))/.012)**2));
+      branch.target.material.color.set(coloredTarget ? (outcome==='yes'?'#42bc42':'#dc3020') : COLORS.purple);
+      if (!coloredTarget) branch.target.material.color.multiply(new THREE.Color(1.029735,1.226228,.924010));
+      branch.target.material.userData.centerColor.set(coloredTarget?(outcome==='yes'?'#645398':'#9a5396'):'#9843ae');
+      branch.target.material.userData.centerAmount.value = coloredTarget ? 1 : flash;
+      branch.target.material.userData.flash.value = flash;
+      const distantFill=1-smooth((t-(timing[path].hit-.3))/.3);
+      branch.target.material.userData.plateFill.value = reached(t,timing[path].color) ? (outcome==='yes'?.88:.56) : .50*distantFill;
+      // Blue-violet rays remain distinct from the pink plate until the
+      // measured result-colour frame, including the close impact view.
+      branch.target.material.userData.rayCool.value = reached(t,timing[path].color) ? 0 : 1;
       branch.target.material.emissive.copy(branch.target.material.color).lerp(new THREE.Color('#4768ff'),flash);
-      branch.target.material.emissiveIntensity=.025+.55*flash;
-      branch.target.bevel.color.copy(branch.target.material.color).multiplyScalar(.6);
+      branch.target.material.emissiveIntensity=coloredTarget?.001:.025*(1-flash);
+      if (coloredTarget) branch.target.ringMaterial.color.copy(branch.target.material.color);
+      else branch.target.ringMaterial.color.set(COLORS.purple);
+      branch.target.ringMaterial.color.lerp(new THREE.Color('#93cfff'),flash);
+      branch.target.ringMaterial.emissive.copy(branch.target.ringMaterial.color);
+      branch.target.ringMaterial.emissive.r*=1+.22*distantFill;
+      branch.target.ringMaterial.emissive.g*=1+.04*distantFill;
+      branch.target.ringMaterial.emissive.b*=1-.04*distantFill;
+      branch.target.ringMaterial.emissiveIntensity=(coloredTarget?(outcome==='yes'?.75:.36):.24+.38*distantFill)*(1-flash);
+      branch.target.ringMaterial.specular.set(coloredTarget?'#8996b5':'#66537d');
+      if (!coloredTarget) branch.target.ringMaterial.specular.multiplyScalar(.45);
+      branch.target.ringMaterial.specular.lerp(new THREE.Color('#c6dfff'),flash);
+      branch.target.ringMaterial.shininess=30;
+      if(coloredTarget) branch.target.bevel.color.copy(branch.target.material.color).multiplyScalar(.6);
+      else branch.target.bevel.color.set('#8d5ac9');
+      branch.target.bevel.specular.set(coloredTarget?'#747494':'#ad8cff');
+      branch.target.bevel.shininess=coloredTarget?45:60;
       branch.target.bevel.emissive.copy(branch.target.bevel.color);
-      branch.target.group.rotation.z = -side(path) * 2.3 * (t - 5.95);
-      for (const pin of branch.pins) { pin.material.color.set(COLORS.cyan); pin.material.emissive.set('#09364f'); }
-      for (const [hit, index, color] of pinContacts[branch.outcome]) if (t >= hit) {
+      branch.target.bevel.emissiveIntensity=coloredTarget?.012:.020;
+      branch.target.group.rotation.z = targetAngleAt(t,path);
+      for (const pin of branch.pins) { pin.material.color.set(COLORS.cyan); pin.material.emissive.set('#254c8e'); pin.material.specular.set('#528fc0'); pin.material.userData.colored.value=0; }
+      for (const [change, index, color] of pinColorEvents[branch.outcome]) if (reached(t,change)) {
         branch.pins[index].material.color.set(COLORS[color]);
+        branch.pins[index].material.userData.colored.value=1;
         branch.pins[index].material.emissive.set(color === 'yes' ? '#062705' : '#300502');
+        branch.pins[index].material.specular.set(COLORS[color]).multiplyScalar(.3);
       }
     }
     const sourceFloor = sourcePosition(path);
-    const poolTravel = smooth((t-1.1)/3.4);
-    pool.position.fromArray(mix([sourceFloor[0],4,sourceFloor[2]+1],[side(path)*TUBE.x,4,TUBE.z],poolTravel));
+    sourceLamp.position.set(sourceFloor[0]+side(path)*8,sourceFloor[1],sourceFloor[2]+8);
+    // The film has hard moving illumination boundaries, not one broad pink
+    // pool following the ball. These measured floor intersections are a light
+    // reconstruction; no extra collidable platform or screen mask is implied.
+    const floorClock=t-(path==='no'?2/30:0);
+    const boundary=track([[0,0,-7.46,0,.2],[.70,-3,-7.46,0,.65],[.95,-6.70,-7.46,0,1],[1.20,-10.61,-7.46,0,1],[1.50,-13.93,-7.46,0,1],[1.90,-8.6,-7.8,1,1],[2.00,-8.42,-7.46,1,1],[2.50,-8.5,-8.5,1,.8],[3.20,-10,-10,1,0]],floorClock);
+    mirror.uniforms.lightBoundary.value.fromArray(boundary);
+    // The right-route light rectangle continues across the late field. Its
+    // two world-space boundaries were measured independently of the pin/ball
+    // camera fits; mirroring the left route lost this visible pink wedge.
+    const latePanel = path==='no'?smooth((t-2)/.15):0;
+    const lateBoundary = track([[2,-8.522,-7.496604],[68/30,-7.20,-6.718798],
+      [2.5,-6.026067,-6.814204],[83/30,-4.386449,-6.690632],
+      [3,5,-3.358361]],t);
+    mirror.uniforms.lightBoundary.value.x=THREE.MathUtils.lerp(boundary[0],lateBoundary[0],latePanel);
+    mirror.uniforms.lightBoundary.value.y=THREE.MathUtils.lerp(boundary[1],lateBoundary[1],latePanel);
+    mirror.uniforms.lightBoundary.value.w=THREE.MathUtils.lerp(boundary[3],1-smooth((t-3.1)/.13),latePanel);
+    mirror.uniforms.latePanelColor.value=latePanel;
+    mirror.uniforms.routeSide.value=side(path);
+    backdrop.material.uniforms.routeSide.value=side(path);
+    mirror.uniforms.openingCut.value=1-smooth((t-.70)/.40)+smooth((t-(timing[path].pulseEnd-.13))/.13);
+    mirror.uniforms.farShade.value=smooth((t-(path==='yes'?158/30:161/30))/(1/30));
+    backdrop.material.uniforms.flightDark.value=mirror.uniforms.farShade.value;
+    // Shared world-space halo/core fitted to both opening views. The changing
+    // floor intersection is inferred illumination, not an original lamp rig.
+    const openingLight=1-smooth((floorClock-.80)/.20);
+    const openingEdge=track(openingFloorEdge[path],t);
+    mirror.uniforms.openingBoundary.value.set(
+      THREE.MathUtils.lerp(-41,openingEdge[0],openingLight),openingEdge[1]*openingLight);
+    const openingZ=track([[0,path==='yes'?3.3:4.4],[.4,path==='yes'?3.7:4.8],[.5,4.4],[.73,0],[.95,1]],floorClock)[0];
+    const openingX=track([[0,path==='yes'?.16:0],[.4,0],[.5,-.4]],floorClock)[0];
+    mirror.uniforms.openingLight.value=openingLight;
+    // The opening reflection is diffuse; the later inlet shots retain clear
+    // reflected turns. Filter the same scene along the deterministic timeline.
+    mirror.uniforms.reflectionLod.value = Math.max(0,1.8+2.2*openingLight
+      + Math.log2(floor.getRenderTarget().width/768));
+    // Early source illumination is steady while the broader floor panel rises.
+    mirror.uniforms.openingPoolStrength.value=THREE.MathUtils.lerp(path==='yes'?.60:.55,boundary[3],smooth((floorClock-.4)/.2));
+    pool.position.set(sourceFloor[0]+side(path)*openingX*openingLight,4,sourceFloor[2]+1+(openingZ-1)*openingLight);
     mirror.uniforms.glow.value.set(pool.position.x, pool.position.z);
-    const finishMix = smooth((t - 5.5) / .5);
-    mirror.uniforms.finish.value = finishMix;
-    backdrop.material.uniforms.finish.value = finishMix;
-    backdrop.material.uniforms.reveal.value = smooth((t - 6.15) / .6);
-    const rise = 12.5 * smooth((t - 6.03) / .73);
-    // A close lamp above the plate gives the reference's bright upper rays
-    // and shaded lower rays. It follows the answer reveal, not camera yaw.
-    const reveal = backdrop.material.uniforms.reveal.value;
-    finalLight.position.fromArray(add(add(f.center, mul(f.up, rise + 5 - 2*reveal)), mul(f.normal, 3 + 7*reveal)));
-    finalLight.intensity = 360 * reveal * finishMix;
-    targetLamp.position.fromArray(add(add(f.center,mul(f.up,3)),mul(f.normal,5)));
-    targetLamp.target.position.fromArray(add(f.center,mul(f.up,3)));
+    mirror.uniforms.coilGlow.value.set(side(path)*TUBE.x,TUBE.z);
+    mirror.uniforms.coilFloorLight.value = smooth((t-timing[path].pulseStart-.10)/.25);
+    const greenCoilLight=colored&&outcome==='yes';
+    // A side lamp leaves the inlet face blue while lighting the far-facing
+    // upper turns pink after the orbit. The position is a reconstruction
+    // from these views; it stays in world space rather than following camera.
+    coilLight.position.set(side(path)*(TUBE.x+(greenCoilLight?-1.8:18)),greenCoilLight?4.4:11,TUBE.z+(greenCoilLight?7.96:7));
+    coilNeutral.position.copy(coilLight.position);
+    coilNeutral.target.position.set(side(path)*TUBE.x,TUBE.y+TUBE.rise/2,TUBE.z);
+    coilNeutral.target.updateMatrixWorld();
+    coilPulse.position.set(side(path)*(TUBE.x-1.8),4.4,TUBE.z+7.96);
+    coilPulse.target.position.set(side(path)*(TUBE.x-1),3.8,TUBE.z+5);
+    coilPulse.target.updateMatrixWorld();
+    coilBlue.position.set(side(path)*(TUBE.x+18),0,TUBE.z+8);
+    coilBlue.target.position.set(side(path)*TUBE.x,3,TUBE.z);
+    coilBlue.target.updateMatrixWorld();
+    const finishMix = smooth((t - (timing[path].hit-.3)) / .3);
+    pinFill.position.set(side(path)*8,3.5,4);
+    pinFill.target.position.set(side(path)*3.5,.5,-.5);
+    pinFill.target.updateMatrixWorld();
+    pinFill.intensity=100*(1-finishMix);
+    const backgroundFinish = smooth((t-(timing[path].hit-2/30))/(2/30));
+    mirror.uniforms.finish.value = backgroundFinish;
+    backdrop.material.uniforms.finish.value = backgroundFinish;
+    // The lower pool is already visible while the word enters the film frame.
+    // Its timing is independent of the lamps illuminating the rising letters.
+    backdrop.material.uniforms.reveal.value = smooth((t - 6.03) / .30);
+    const rise = revealRise(t,path);
+    // The answer's broad lower/front lamp produces the observed letter
+    // gradients. Its reveal follows the same world-space rise, not camera yaw.
+    const reveal = smooth((t - 6.15) / .6);
+    const answerLamp = outcome === 'yes'
+      ? [-.734107,-.101153,4.104722] : [1.212373,-.492924,6.822341];
+    finalLight.position.fromArray(add(add(add(f.center,
+      mul(f.up,rise+THREE.MathUtils.lerp(5,answerLamp[1],reveal))),
+      mul(f.normal,THREE.MathUtils.lerp(3,answerLamp[2],reveal))),
+      mul(f.right,answerLamp[0]*reveal)));
+    finalLight.intensity = (outcome==='yes'?145:360) * reveal * finishMix;
+    const targetLampHeight=reached(t,timing[path].color)?3:4.530548;
+    const targetLampDistance=reached(t,timing[path].color)?5:5.268488;
+    targetLamp.position.fromArray(add(add(f.center,mul(f.up,targetLampHeight)),mul(f.normal,targetLampDistance)));
+    targetLamp.target.position.fromArray(add(f.center,mul(f.up,targetLampHeight)));
     targetLamp.target.updateMatrixWorld();
-    targetLamp.intensity=140*finishMix*(1-reveal);
-    ambient.intensity = .14 - .105 * finishMix;
-    key.position.fromArray(mix([-5, 18, -6], add(add(f.center, mul(f.up, rise + 4)), add(mul(f.normal, 10), mul(f.right, -4))), finishMix));
+    const coilEntryLight=THREE.MathUtils.lerp(.2,1,coilGlowRise);
+    coilLight.intensity=colored&&!greenCoilLight?300*(1-finishMix)*coilEntryLight:0;
+    coilNeutral.intensity=colored?0:300*(1-finishMix);
+    coilPulse.intensity=greenCoilLight?22*(1-finishMix)*coilEntryLight:0;
+    coilBlue.intensity=colored ? 0 : .5*smooth((t-1.8)/.3)*(1-finishMix);
+    targetLamp.intensity=(reached(t,timing[path].color)?60:114.356012)*finishMix*(1-reveal);
+    targetEdgeLamp.position.fromArray(add(f.center,mul(f.up,10)));
+    targetEdgeLamp.target.position.fromArray(f.center);
+    targetEdgeLamp.target.updateMatrixWorld();
+    targetEdgeLamp.intensity=1.8*finishMix*(1-reveal)*(reached(t,timing[path].color)?0:1);
+    // A wider neutral cone reaches the upper lateral rays. Their dark lower
+    // faces come from the same fixed lamp, not a constant blue emission.
+    targetLamp.angle=reached(t,timing[path].color)?.80:1.10;
+    targetBlue.position.fromArray(add(add(f.center,mul(f.up,-2)),mul(f.normal,4.5)));
+    targetBlue.target.position.fromArray(add(f.center,mul(f.up,-.759815)));
+    targetBlue.target.updateMatrixWorld();
+    targetBlue.intensity=28.591933*finishMix*(!reached(t,timing[path].color)?1:0);
+    ambient.intensity = .14 - .130 * finishMix;
+    key.position.fromArray(mix(mix([-5,18,-6],[-5,12,-12],smooth((t-1.2)/.6)), add(add(f.center, mul(f.up, rise + 4)), add(mul(f.normal, 10), mul(f.right, -4))), finishMix));
     key.target.position.fromArray(mix([0,0,0], add(f.center, mul(f.up, rise)), finishMix));
     key.target.updateMatrixWorld();
-    key.intensity = 2.5 - 2.4 * finishMix;
-    fill.intensity = 1.0 - .94 * finishMix;
+    key.intensity = 2.5 - 2.48 * finishMix;
+    fill.intensity = 1.0 - .99 * finishMix;
     renderer.setRenderTarget(radiance);
     renderer.render(scene, camera);
     if (radiance) output.render(renderer, radiance, radiance, 0, false);

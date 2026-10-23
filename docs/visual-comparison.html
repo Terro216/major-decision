@@ -8,33 +8,35 @@ body{margin:24px;background:#101726;color:#dce5f4;font:16px/1.5 system-ui}main{m
 </style>
 <main>
 <h1>Фильм / до / после</h1>
-<p>Проход к выпуску от 21 октября 2026. «До» — сохранённая версия 5d2189c, заново собранная и экспортированная перед правками. Радиус шара, просвет, прозрачность и постановочные ключи камеры сохранены. Уточнены ободки трубы, свечение шара, индикатор и оболочка; добавлены мобильная компоновка, звук и доступность. Границы визуального сходства записаны в отчёте, пользовательское принятие не предполагается.</p>
-<p><a href="RELEASE_REVIEW.md">Наблюдения и границы проверки</a> · <a href="HANDOFF.md">Handoff</a> · <a href="camera-scenarios.html">Четыре сочетания маршрута и ответа</a></p>
+<p>Сведение с фильмом, 23 октября 2026. «До» — фактически опубликованная в начале прохода версия bee1d41; её сохранённые ролики не изменялись. В версии 56a восстановлены композиция и ритм обеих веток, рисунок веера, облёт спирали, свет и отражения. Полный радиус шара .58 и минимальный радиус канала .70 проверяются независимо от постановочной камеры.</p>
+<p><a href="PERCEPTUAL_REVIEW.md">Наблюдения и границы проверки</a> · <a href="HANDOFF.md">Статус проверок и выпуска</a> · <a href="camera-scenarios.html">Четыре сочетания маршрута и ответа</a></p>
 <div><button data-movie="yes" aria-pressed="true">YES · LEFT</button><button data-movie="no" aria-pressed="false">NO · RIGHT</button></div>
 <div><button id="play-movies">PLAY / RESTART</button><button id="pause-movies">PAUSE</button><button id="resume-movies">RESUME</button><label>Скорость <select id="movie-speed"><option value="1">1×</option><option value="0.25">¼×</option></select></label><label>Время <input id="movie-time" type="range" min="0" max="6.9" step="any" value="0"></label><output id="timecode">0.00 s</output></div>
 <div class="movies">
-<figure><figcaption>Фильм · без коррекции перспективы монитора</figcaption><video id="film" controls muted playsinline preload="metadata"></video></figure>
-<figure><figcaption>До · исходная версия этого прохода</figcaption><video id="before" controls muted playsinline preload="metadata"></video></figure>
-<figure><figcaption>После · точные 24 кадра/с таймлайна</figcaption><video id="after" controls muted playsinline preload="metadata"></video></figure>
+<figure><figcaption>Фильм · фиксированная коррекция перспективы</figcaption><video id="film" controls muted playsinline preload="metadata"></video></figure>
+<figure><figcaption>До · bee1d41, исходная версия этого прохода</figcaption><video id="before" controls muted playsinline preload="metadata"></video></figure>
+<figure><figcaption>После · 56a, точные 30 кадров/с таймлайна</figcaption><video id="after" controls muted playsinline preload="metadata"></video></figure>
 </div>
-<p>Полный ролик из трёх колонок: <a id="triple">скачать</a>. Полная текущая последовательность: <a id="single">скачать</a>. Это детерминированный экспорт, а не измерение FPS устройства. Привязка оригинала приблизительная: YES +5.70 с, NO +6.20 с. Точки контакта между кадрами дополнительно проверены по геометрии.</p>
+<p>Полный ролик из трёх колонок: <a id="triple">скачать</a>. Полная текущая последовательность: <a id="single">скачать</a>. Ноль фильма: YES 173/30 с, NO 188/30 с; скорость всех трёх колонок — 1×. Для каждого исходного клипа применяется одна постоянная коррекция перспективы, без покадровой деформации или изменения скорости. Кривизна CRT, дрожание и разрывы развёртки остаются. «До» сохраняет исходные 24 fps, «после» экспортировано в 30 fps. Это не измерение FPS устройства.</p>
 <h2>Проблемные участки крупно</h2>
 <p>В каждом листе колонки: FILM / BEFORE / AFTER. Нажмите на лист, чтобы открыть полный размер.</p>
 <div class="stills">
+<figure><figcaption>Старт и выход из веера</figcaption><a id="fan-link"><img id="fan" alt="Старт и веер: фильм, до, после"></a></figure>
 <figure><figcaption>Подход и вход</figcaption><a id="entry-link"><img id="entry" alt="Подход и вход: фильм, до, после"></a></figure>
 <figure><figcaption>Проход в спирали и выход</figcaption><a id="coil-link"><img id="coil" alt="Спираль: фильм, до, после"></a></figure>
 <figure><figcaption>Выход, крупный план, попадание</figcaption><a id="exit-link"><img id="exit" alt="Попадание: фильм, до, после"></a></figure>
-</div><p><a href="../references/review/2026-10-21-release/opaque-diagnostics.png">Оба маршрута с непрозрачной трубой: поле, вход и выход</a>. Эти отдельные диагностические ракурсы проверяют геометрию; в полной анимации используются прежние постановочные ключи.</p><p id="error" role="alert"></p>
+<figure><figcaption>Окраска мишени и ответ</figcaption><a id="finish-link"><img id="finish" alt="Мишень и ответ: фильм, до, после"></a></figure>
+</div><p><a href="../references/review/2026-10-23-release/opaque-diagnostics.png">Оба маршрута с непрозрачной трубой: поле, вход и выход</a>. Эти отдельные диагностические ракурсы дополняют проверку всего объёма шара между кадрами. В полной анимации используются постановочные ракурсы.</p><p id="error" role="alert"></p>
 </main>
 <script>
-const root='../references/review/2026-10-21-release/';
+const root='../references/review/2026-10-23-release/';
 const videos=[...document.querySelectorAll('video')], slider=document.querySelector('#movie-time');
 const pause=()=>videos.forEach(v=>v.pause());
 const play=()=>Promise.all(videos.map(v=>v.play())).catch(e=>document.querySelector('#error').textContent=e.message);
 function select(branch){pause();document.body.dataset.ready=branch;document.querySelector('#error').textContent='';slider.value=0;document.querySelector('#timecode').textContent='0.00 s';
 for(const v of videos){v.src=root+v.id+'-'+branch+'.mp4';v.load();v.playbackRate=Number(document.querySelector('#movie-speed').value)}
 for(const button of document.querySelectorAll('[data-movie]'))button.setAttribute('aria-pressed',String(button.dataset.movie===branch));
-for(const area of ['entry','coil','exit']){const url=root+branch+'-'+area+'.png';document.querySelector('#'+area).src=url;document.querySelector('#'+area+'-link').href=url}
+for(const area of ['fan','entry','coil','exit','finish']){const url=root+branch+'-'+area+'.png';document.querySelector('#'+area).src=url;document.querySelector('#'+area+'-link').href=url}
 document.querySelector('#triple').href=root+'compare-'+branch+'.mp4';document.querySelector('#single').href=root+'after-'+branch+'.mp4';}
 for(const button of document.querySelectorAll('[data-movie]'))button.onclick=()=>select(button.dataset.movie);
 document.querySelector('#play-movies').onclick=()=>{videos.forEach(v=>v.currentTime=0);play()};

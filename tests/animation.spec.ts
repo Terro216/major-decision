@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import { webglCapture } from './webglCapture';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { reviewFrames } from '../src/animation/reviewFrames';
 
@@ -110,8 +110,11 @@ test('losing WebGL preserves the chosen result and leaves reset usable', async (
   await expect(page.locator('.decision-stage')).toHaveAttribute('data-phase', 'idle');
 });
 
-test('capture both film timelines at all supplied animation frames', async ({ page }) => {
-  test.setTimeout(300_000);
+// At the reference resolution SwiftShader takes 16–18 seconds per image on
+// the two-CPU runner. Keep all 33 observations, with one bounded test per clip.
+for (const outcome of ['yes', 'no'] as const) {
+test(`capture ${outcome.toUpperCase()} film timeline at all supplied animation frames`, async ({ page }) => {
+  test.setTimeout(480_000);
   const artifacts = process.env.MD_REVIEW_DIR || '.review';
   await mkdir(path.join(artifacts, 'frames'), { recursive: true });
   await page.setViewportSize({ width: 1680, height: 1250 });
@@ -123,23 +126,30 @@ test('capture both film timelines at all supplied animation frames', async ({ pa
   await page.goto('/?review=1');
   await page.evaluate(() => document.fonts.ready);
   const machineBox = (await page.locator('.machine').boundingBox())!;
-  await page.screenshot({ clip: machineBox, path: path.join(artifacts, 'machine-start.png') });
-  for (const outcome of ['yes', 'no'] as const) {
-    await page.getByRole('button', { name: outcome.toUpperCase(), exact: true }).click();
-    await expect(page.locator('.decision-stage')).toHaveAttribute('data-renderer', 'webgl');
-    await page.screenshot({ clip: machineBox, path: path.join(artifacts, `machine-${outcome}.png`) });
-    for (const [time, film] of reviewFrames[outcome]) {
-      await page.getByRole('slider', { name: 'Animation time' }).fill(String(time));
-      await expect(page.locator('.decision-stage')).toHaveAttribute('data-time', time.toFixed(3));
-      const app = `frames/${outcome}-${time.toFixed(2)}.png`;
-      await page.screenshot({ clip: machineBox, path: path.join(artifacts, app) });
-      index.push({ outcome, time, film, app });
-      if (index.length % 5 === 0) console.log(`Captured ${index.length}/33 reference moments`);
-    }
+  if (outcome === 'yes') await page.screenshot({ clip: machineBox, path: path.join(artifacts, 'machine-start.png') });
+  await page.getByRole('button', { name: outcome.toUpperCase(), exact: true }).click();
+  await expect(page.locator('.decision-stage')).toHaveAttribute('data-renderer', 'webgl');
+  await page.screenshot({ clip: machineBox, path: path.join(artifacts, `machine-${outcome}.png`) });
+  for (const [time, film] of reviewFrames[outcome]) {
+    // Subtracting the film's frame-based offset leaves 17-digit tails.
+    // Chromium canonicalizes range values, so fill rejects that text before
+    // dispatching input. Keep sub-microsecond precision in the test value.
+    await page.getByRole('slider', { name: 'Animation time' }).fill(String(Number(time.toFixed(6))));
+    await expect(page.locator('.decision-stage')).toHaveAttribute('data-time', time.toFixed(3));
+    const app = `frames/${outcome}-${time.toFixed(2)}.png`;
+    await page.screenshot({ clip: machineBox, path: path.join(artifacts, app) });
+    index.push({ outcome, time, film, app });
+    if (index.length % 5 === 0) console.log(`Captured ${outcome.toUpperCase()} ${index.length}/${reviewFrames[outcome].length} reference moments`);
   }
   expect(errors).toEqual([]);
-  await writeFile(path.join(artifacts, 'frames/index.json'), JSON.stringify(index, null, 2));
+  const indexPath = path.join(artifacts, 'frames/index.json');
+  const previous: typeof index = JSON.parse(await readFile(indexPath, 'utf8').catch(error => {
+    if (error.code === 'ENOENT') return '[]';
+    throw error;
+  }));
+  await writeFile(indexPath, JSON.stringify([...previous.filter(row => row.outcome !== outcome), ...index], null, 2));
 });
+}
 
 for (const outcome of ['yes', 'no'] as const) {
   test(`record ${outcome.toUpperCase()} playback for video comparison`, async ({ browser }) => {
@@ -197,4 +207,24 @@ test('unavailable WebGL immediately presents the already selected answer', async
   expect(await page.evaluate(() => (window as any).decisionDraws)).toBe(1);
   await page.getByRole('button', { name: 'NEW QUESTION' }).click();
   await expect(page.getByRole('textbox')).toBeFocused();
+});
+
+
+test('review frame boundaries survive native range input serialization', async ({ page }) => {
+  await page.setViewportSize({width:800,height:1000});
+  for(const outcome of ['yes','no'] as const) {
+    await page.goto(`/?review=1&outcome=${outcome}&t=0`);
+    const stage=page.locator('.decision-stage');
+    await expect(stage).toHaveAttribute('data-renderer','webgl');
+    const color=outcome==='yes'?175/30:176/30;
+    const pulse=outcome==='yes'?128/30:130/30;
+    const clear=outcome==='yes'?145/30:146/30;
+    for(const [time,shot] of [[color-1e-6,'target'],[color,'target-color'],[pulse,'spiral-color'],[clear-1e-6,'spiral-color'],[clear,'exit']] as const) {
+      await page.getByRole('slider',{name:'Animation time'}).evaluate((input,time)=>{
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value')!.set!.call(input,String(time));
+        input.dispatchEvent(new Event('input',{bubbles:true}));
+      },time);
+      await expect(stage).toHaveAttribute('data-shot',shot);
+    }
+  }
 });

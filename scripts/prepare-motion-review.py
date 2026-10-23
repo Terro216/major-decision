@@ -12,7 +12,11 @@ ROOT = Path(__file__).resolve().parents[1]
 WORK = ROOT / '.review'
 OUT = ROOT / 'references/review/2026-10-20-motion'
 BASE = ['ffmpeg', '-nostdin', '-hide_banner', '-loglevel', 'error', '-threads', '2', '-filter_threads', '2', '-filter_complex_threads', '2']
-ENCODE = ['-an', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '18', '-pix_fmt', 'yuv420p', '-movflags', '+faststart']
+ENCODE = ['-an', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '18', '-pix_fmt', 'yuv420p', '-color_range', 'tv', '-colorspace', 'bt709', '-color_trc', 'bt709', '-color_primaries', 'bt709', '-movflags', '+faststart']
+# Decode each source's matrix/range before combining RGB screenshots with video.
+# A YUV hstack otherwise silently treats every input as the first one's matrix.
+VIDEO_COLOR = 'scale=out_color_matrix=bt709:out_range=tv,format=yuv420p'
+JPEG_COLOR = 'format=rgb24,scale=out_color_matrix=bt601:out_range=pc,format=yuvj444p'
 
 def run(args):
     bounded = []
@@ -24,32 +28,35 @@ def run(args):
 
 def encode_frames(source, destination, fps):
     run(['-framerate', str(fps), '-i', str(source / 'frame-%03d.png'),
-         '-vf', 'scale=1240:-2,setsar=1,tpad=stop_mode=clone:stop_duration=0.5',
+         '-vf', f'scale=1240:-2,format=rgb24,setsar=1,tpad=stop_mode=clone:stop_duration=0.5,{VIDEO_COLOR}',
          *ENCODE, destination])
 
-def sheets(movie, name):
-    run(['-i', str(movie), '-vf', 'fps=24,scale=384:220,pad=384:244:0:24:color=0x101726,drawtext=text=%{pts}:x=8:y=3:fontcolor=white:fontsize=16,tile=5x6',
+def sheets(movie, name, fps=24):
+    run(['-i', str(movie), '-vf', f'fps={fps},scale=384:220,format=rgb24,pad=384:244:0:24:color=0x101726,drawtext=text=%{{pts}}:x=8:y=3:fontcolor=white:fontsize=16,tile=5x6,{JPEG_COLOR}',
          '-q:v', '2', WORK / 'inspection' / f'{name}-%02d.jpg'])
 
-def compare(branch):
+def compare(branch, fps=24):
     movies = [OUT / f'{kind}-{branch}.mp4' for kind in ['film', 'before', 'after']]
     filters = []
     for i, title in enumerate(['FILM', 'BEFORE', 'AFTER']):
-        filters.append(f'[{i}:v]fps=24,scale=640:368:force_original_aspect_ratio=decrease,pad=640:400:(ow-iw)/2:32:color=0x101726,setsar=1,drawtext=text={title}:x=12:y=5:fontcolor=white:fontsize=20[v{i}]')
-    filters.append('[v0][v1][v2]hstack=inputs=3:shortest=1[out]')
+        filters.append(f'[{i}:v]fps={fps},scale=640:368:force_original_aspect_ratio=decrease,format=rgb24,pad=640:400:(ow-iw)/2:32:color=0x101726,setsar=1,drawtext=text={title}:x=12:y=5:fontcolor=white:fontsize=20[v{i}]')
+    filters.append(f'[v0][v1][v2]hstack=inputs=3:shortest=1,{VIDEO_COLOR}[out]')
     args = sum((['-i', str(movie)] for movie in movies), [])
     run([*args, '-filter_complex', ';'.join(filters), '-map', '[out]', *ENCODE, OUT / f'compare-{branch}.mp4'])
-    # Large triples at both mouths, in the helix, and at the actual target.
-    # 5.83 selects the first 24 fps frame after the 5.80 impact; rounding 5.80
-    # itself would select 5.7917 and show an approach instead of actual contact.
-    windows = {'entry': [4.15, 4.30, 4.40, 4.45], 'coil': [4.50, 4.65, 4.80, 4.94], 'exit': [5.10, 5.45, 5.83, 5.95]}
+    # Large triples at both mouths, in the helix, and at the target. Select
+    # actual frames at the export rate; never retime a panel to align an event.
+    windows = {'fan': [.50, 1.50, 2.50, 3.50],
+               'entry': [4.15, 4.30, 4.40, 4.45],
+               'coil': [4.50, 4.65, 4.80, 4.94],
+               'exit': [5.10, 5.45, 5.83, 5.95],
+               'finish': [5.70, 5.90, 6.30, 6.90]}
     if branch == 'no':
         windows['entry'] = [4.15, 4.30, 4.40, 4.50]
     for area, times in windows.items():
-        frames = sorted(set(round(t * 24) for t in times))
+        frames = sorted(set(round(t * fps) for t in times))
         select = '+'.join(f'eq(n\\,{frame})' for frame in frames)
         run(['-i', str(OUT / f'compare-{branch}.mp4'), '-vf', f"select='{select}',drawtext=text=%{{pts}}:x=520:y=5:fontcolor=white:fontsize=20,tile=1x4", '-frames:v', '1', OUT / f'{branch}-{area}.png'])
-    run(['-i', str(OUT / f'compare-{branch}.mp4'), '-vf', 'fps=4,scale=1440:300,pad=1440:324:0:24:color=0x101726,drawtext=text=%{pts}:x=8:y=3:fontcolor=white:fontsize=16,tile=1x10',
+    run(['-i', str(OUT / f'compare-{branch}.mp4'), '-vf', f'fps=4,scale=1440:300,format=rgb24,pad=1440:324:0:24:color=0x101726,drawtext=text=%{{pts}}:x=8:y=3:fontcolor=white:fontsize=16,tile=1x10,{JPEG_COLOR}',
          '-q:v', '2', WORK / 'inspection' / f'comparison-{branch}-%02d.jpg'])
 
 
@@ -83,7 +90,7 @@ def main():
                 shutil.copy2(WORK / name, saved / name)
     else:
         for branch, clip, start, crop in [('yes', '06m36s-06m50s.mp4', 5.7, '1630:920:145:160'), ('no', '08m35s-08m50s.mp4', 6.2, '1623:915:154:163')]:
-            run(['-ss', str(start), '-i', str(ROOT / 'references/film' / clip), '-t', '7.46', '-vf', f'crop={crop},scale=1240:700,setsar=1', *ENCODE, OUT / f'film-{branch}.mp4'])
+            run(['-ss', str(start), '-i', str(ROOT / 'references/film' / clip), '-t', '7.46', '-vf', f'crop={crop},scale=1240:700,format=rgb24,setsar=1,{VIDEO_COLOR}', *ENCODE, OUT / f'film-{branch}.mp4'])
             compare(branch)
         diagnostic_inputs, diagnostic_filters = [], []
         for i, (view, branch) in enumerate((v, b) for v in ['top', 'mouth', 'side'] for b in ['yes', 'no']):

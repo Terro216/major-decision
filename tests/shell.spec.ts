@@ -61,7 +61,9 @@ test('all app assets are self hosted, question stays out of network and storage'
 });
 
 test('reference captures and viewports', async ({ page }) => {
-  test.setTimeout(120_000);
+  // Full-page raster captures at six viewport sizes include software WebGL
+  // startup and resize work; all sizes and overflow assertions are retained.
+  test.setTimeout(240_000);
   const artifacts = process.env.MD_REVIEW_DIR || '.review';
   await mkdir(artifacts, { recursive: true });
   await page.setViewportSize({ width: 1600, height: 1100 });

@@ -3,7 +3,9 @@ import { defineConfig } from '@playwright/test';
 export default defineConfig({
   testDir: './tests',
   workers: 1,
-  timeout: 60_000,
+  // Cold SwiftShader startup, multi-step UI checks and context teardown exceed
+  // 60 s on two CPUs. Keep individual assertion and playback deadlines below.
+  timeout: 120_000,
   expect: { timeout: 12_000 },
   reporter: [['list']],
   use: {

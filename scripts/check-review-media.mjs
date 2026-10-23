@@ -28,7 +28,34 @@ try {
     await page.waitForFunction(() => [...document.querySelectorAll('video')].every(v=>v.currentTime>1.5&&!v.paused&&v.playbackRate===.25));
     await page.locator(pause).click();
     await page.locator(speed).selectOption({label:'1×'});
-    return {metadata,seeks,quarterSpeedPlayed:true};
+    await page.evaluate(() => {
+      window.mediaStartedAt = performance.now();
+      // Keep seeking/quarter-speed decoder counters separate from the full 1x run.
+      window.mediaQualityStart = [...document.querySelectorAll('video')].map(v => {
+        const q=v.getVideoPlaybackQuality();
+        return {frames:q.totalVideoFrames,dropped:q.droppedVideoFrames};
+      });
+    });
+    await page.locator(play).click();
+    await page.waitForFunction(() => [...document.querySelectorAll('video')].every(v => v.ended && !v.error), {}, {timeout:25000});
+    const normalSpeedPlayback = await page.evaluate(() => ({
+      wallSeconds: (performance.now()-window.mediaStartedAt)/1000,
+      videos: [...document.querySelectorAll('video')].map((v,i) => {
+        const quality=v.getVideoPlaybackQuality();
+        const initial=window.mediaQualityStart[i];
+        return {src:v.getAttribute('src'),time:v.currentTime,duration:v.duration,
+          rate:v.playbackRate,ended:v.ended,error:v.error?.code??null,
+          frames:quality.totalVideoFrames-initial.frames,
+          dropped:quality.droppedVideoFrames-initial.dropped,
+          totalFrames:quality.totalVideoFrames,totalDropped:quality.droppedVideoFrames,
+          played:Array.from({length:v.played.length},(_,i)=>[v.played.start(i),v.played.end(i)])};
+      }),
+    }));
+    assert(normalSpeedPlayback.wallSeconds>=6.7);
+    assert(normalSpeedPlayback.videos.every(v=>v.rate===1 && v.ended && !v.error
+      && Math.abs(v.time-v.duration)<.03
+      && v.played.some(([start,end])=>start<.05 && end>=v.duration-.05)));
+    return {metadata,seeks,quarterSpeedPlayed:true,normalSpeedPlayed:true,normalSpeedPlayback};
   }
   await page.goto('file:///repo/docs/visual-comparison.html');
   for(const branch of ['yes','no']) {
@@ -41,5 +68,5 @@ try {
   result.push({scenarios:'all four',...await exercise('#play','#pause','#speed','#time',4)});
   assert.equal(await page.locator('#error').innerText(),'');
   writeFileSync('/artifacts/media-check.json',JSON.stringify({checkedAt:new Date().toISOString(),result},null,2));
-  console.log('Both film/before/after triples and all four route/answer videos: play, pause, forward/backward seek, quarter speed; six comparison images loaded.');
+  console.log('Both film/before/after triples and all four route/answer videos: complete 1x playback, play/pause, forward/backward seek and quarter speed; comparison images loaded.');
 } finally { await browser.close(); }

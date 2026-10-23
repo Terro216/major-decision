@@ -48,38 +48,44 @@ function SmallIcon({ kind, x, y, radius }: { kind: 'hand' | 'orbit' | 'blocks' |
 export function Frame() {
   return <svg className="frame-art" viewBox="0 0 1600 920" aria-hidden="true">
     <defs>
-      <linearGradient id="body-blue" x2=".9" y2="1"><stop stopColor="#174fae"/><stop offset=".4" stopColor="#123f9a"/><stop offset="1" stopColor="#112d74"/></linearGradient>
-      <radialGradient id="body-light" cx=".04" cy=".55" r=".8"><stop stopColor="#2258b7" stopOpacity=".7"/><stop offset="1" stopColor="#0c205f" stopOpacity="0"/></radialGradient>
+      <linearGradient id="body-blue" x2=".9" y2="1"><stop stopColor="#16469c"/><stop offset=".4" stopColor="#123a8a"/><stop offset="1" stopColor="#112d74"/></linearGradient>
+      <radialGradient id="body-light" cx=".04" cy=".55" r=".8"><stop stopColor="#204fa3" stopOpacity=".7"/><stop offset="1" stopColor="#0c205f" stopOpacity="0"/></radialGradient>
+      <linearGradient id="body-edge-shadow" x1="0" y1="0" x2=".10" y2="0"><stop stopColor="#020b28" stopOpacity=".42"/><stop offset="1" stopColor="#020b28" stopOpacity="0"/></linearGradient>
+      <linearGradient id="body-shadow-y" x1="0" y1="0" x2="0" y2="1"><stop offset=".18" stopColor="black"/><stop offset=".34" stopColor="white"/></linearGradient>
+      <mask id="body-shadow-mask"><rect width="1600" height="920" fill="url(#body-shadow-y)"/></mask>
       <linearGradient id="edge-blue" x1="1" y1="0" x2="0" y2="1"><stop stopColor="#071331"/><stop offset=".65" stopColor="#15336f"/><stop offset=".91" stopColor="#3376bd"/><stop offset=".98" stopColor="#8ce6f4"/><stop offset="1" stopColor="#234e91"/></linearGradient>
-      <linearGradient id="stage-trim" x1="0" y1="0" x2="1" y2="1"><stop stopColor="#c4e6ed"/><stop offset=".4" stopColor="#aab6d2"/><stop offset="1" stopColor="#889fc2"/></linearGradient>
+      <linearGradient id="stage-trim" x1="0" y1="0" x2="1" y2="1"><stop stopColor="#daf4ff"/><stop offset=".4" stopColor="#c0cde5"/><stop offset="1" stopColor="#9eb5d4"/></linearGradient>
       <linearGradient id="icon-bezel" x1=".75" y1="0" x2=".15" y2="1"><stop stopColor="#091d4f"/><stop offset=".48" stopColor="#12347d"/><stop offset=".78" stopColor="#316aa9"/><stop offset=".94" stopColor="#80d8e9"/><stop offset="1" stopColor="#214c8b"/></linearGradient>
-      <radialGradient id="icon-face" cx=".7" cy=".3" r=".8"><stop stopColor="#3e76b8"/><stop offset=".7" stopColor="#2a60a7"/><stop offset="1" stopColor="#193c7a"/></radialGradient>
+      <radialGradient id="icon-face" cx=".7" cy=".3" r=".8"><stop stopColor="#387fc8"/><stop offset=".7" stopColor="#2869b6"/><stop offset="1" stopColor="#174587"/></radialGradient>
       <linearGradient id="icon-metal" x2=".8" y2="1"><stop stopColor="#dbedf6"/><stop offset=".42" stopColor="#77aed3"/><stop offset=".7" stopColor="#b6dce9"/><stop offset="1" stopColor="#547ca9"/></linearGradient>
-      <radialGradient id="badge-blue" cx=".25" cy=".65" r=".85"><stop stopColor="#3f89bb"/><stop offset=".5" stopColor="#2e65a1"/><stop offset="1" stopColor="#152b68"/></radialGradient>
+      <radialGradient id="badge-blue" cx=".25" cy=".35" r=".85"><stop stopColor="#317fc4"/><stop offset=".5" stopColor="#234f9d"/><stop offset="1" stopColor="#0b235b"/></radialGradient>
       <linearGradient id="edge-glint" x1="0" y1="0" x2="1" y2="0"><stop stopColor="#dbffff"/><stop offset=".35" stopColor="#64ccea"/><stop offset="1" stopColor="#286bb7" stopOpacity="0"/></linearGradient>
       <filter id="cast-edge" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="2"/></filter>
     </defs>
     <rect x="4" y="4" width="1592" height="912" rx="16" fill="url(#body-blue)" stroke="#061731" strokeWidth="8"/>
     <rect x="12" y="12" width="1576" height="900" fill="url(#body-light)"/>
+    <rect x="12" y="12" width="1576" height="900" fill="url(#body-edge-shadow)" mask="url(#body-shadow-mask)"/>
     <path d="M10 15H1574Q1592 10 1592 29V898" fill="none" stroke="#3166b2" strokeWidth="5"/>
     <path d="M1585 13l-9 8" stroke="#c6f8ff" strokeWidth="3"/>
-    <rect x="389" y="10" width="1194" height="164" rx="17" fill="#030b0b" stroke="#0c2053" strokeWidth="16"/>
-    <rect x="389" y="10" width="1194" height="164" rx="17" fill="none" stroke="url(#edge-blue)" strokeWidth="7"/>
-    <path d="M388 148q0 24 23 24h150" fill="none" stroke="url(#edge-glint)" strokeWidth="4"/>
+    <rect x="402" y="10" width="1181" height="151" rx="17" fill="#030b0b" stroke="#0c2053" strokeWidth="16"/>
+    <rect x="402" y="10" width="1181" height="151" rx="17" fill="none" stroke="url(#edge-blue)" strokeWidth="7"/>
+    <path d="M401 135q0 24 23 24h150" fill="none" stroke="url(#edge-glint)" strokeWidth="4"/>
     <path d={stageOutline} fill="#070f3e" stroke="#0a2058" strokeWidth="19"/>
     <path d={stageOutline} fill="none" stroke="#285a9a" strokeWidth="8"/>
-    <path d={stageOutline} fill="none" stroke="url(#stage-trim)" strokeWidth="2.5"/>
+    <path d={stageOutline} fill="none" stroke="url(#stage-trim)" strokeWidth="4"/>
     <path d="M405 183C440 236 448 267 444 306M364 523q38 2 38 49M365 747q84 28 80 99" fill="none" stroke="url(#edge-glint)" strokeWidth="10"/>
-    <path d="M406 183q25 38 31 64M365 525q23 0 29 18M366 749q29 9 46 24" fill="none" stroke="#cef9ff" strokeWidth="2.7"/>
-    <SmallIcon kind="hand" x={195} y={122} radius={54}/>
-    <SmallIcon kind="orbit" x={316} y={92} radius={56}/>
-    <SmallIcon kind="blocks" x={117} y={235} radius={52}/>
-    <SmallIcon kind="columns" x={111} y={359} radius={52}/>
+    <path d="M406 183q25 38 31 64M365 525q23 0 29 18M366 749q29 9 46 24" fill="none" stroke="#cef9ff" strokeWidth="4.1"/>
+    <SmallIcon kind="hand" x={195} y={107} radius={54}/>
+    <SmallIcon kind="orbit" x={316} y={71} radius={56}/>
+    <SmallIcon kind="blocks" x={126} y={219} radius={52}/>
+    <SmallIcon kind="columns" x={122} y={344} radius={52}/>
+    <g transform="translate(8 -14)">
     <circle cx="302" cy="289" r="132" fill="#061942" filter="url(#cast-edge)"/>
     <circle cx="302" cy="294" r="128" fill="url(#icon-bezel)"/>
     <circle cx="302" cy="294" r="116" fill="url(#badge-blue)" stroke="#22568d" strokeWidth="3"/>
     <path d="M189 324q18 77 98 88" fill="none" stroke="#53bad7" strokeWidth="6"/>
     <path d="M194 342q18 46 58 62" fill="none" stroke="#bdf6f5" strokeWidth="2.5"/>
+    </g>
     <ellipse cx="233" cy="843" rx="198" ry="105" fill="#020607" stroke="#112a68" strokeWidth="18"/>
     <path d="M37 830q-3 48 42 78M356 759q92 31 77 103" fill="none" stroke="#449aca" strokeWidth="8"/>
     <path d="M42 853q6 29 27 43M357 756q72 22 80 66" fill="none" stroke="#b2f5fa" strokeWidth="3"/>
@@ -93,7 +99,7 @@ export function Frame() {
 
 export function AskSymbol() {
   return <svg viewBox="0 0 120 160" aria-hidden="true">
-    <defs><linearGradient id="ask-fill" x1=".6" y1="0" x2=".3" y2="1"><stop stopColor="#54b5d3"/><stop offset=".65" stopColor="#3e9ec5"/><stop offset="1" stopColor="#80d4e4"/></linearGradient></defs>
+    <defs><linearGradient id="ask-fill" x1=".6" y1="0" x2=".3" y2="1"><stop stopColor="#3bb5ee"/><stop offset=".65" stopColor="#2b9edf"/><stop offset="1" stopColor="#59d4ff"/></linearGradient></defs>
     <path className="ask-glyph" d="M16 49V29Q17 6 59 7Q105 5 109 40Q113 67 75 83L69 102H35L36 78Q38 65 59 57Q75 51 72 39Q70 29 61 30Q51 30 51 43L49 50Z" fill="url(#ask-fill)" stroke="#082658" strokeWidth="10" strokeLinejoin="round"/>
     <circle className="ask-dot" cx="51" cy="129" r="23" fill="url(#ask-fill)" stroke="#082658" strokeWidth="8"/>
     <path d="M17 49l10 9 18-8M30 130q0 15 18 20" fill="none" stroke="#a5ecf4" strokeWidth="4"/>

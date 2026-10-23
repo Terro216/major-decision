@@ -26,29 +26,32 @@ async function external(page: Page) {
   await page.getByRole('textbox').fill('Личный вопрос private-entropy-123');
 }
 
-test('every independently drawn route can finish with either answer, including fallback', async ({ page }) => {
-  test.setTimeout(120_000);
-  for (const route of [0, 1]) for (const answer of [0, 1]) {
-    await draws(page, route, answer);
-    await page.goto('/?outcome=no&scenario=right&t=6.9');
-    await expect(page.locator('.decision-stage')).toHaveAttribute('data-phase', 'idle');
-    await page.getByRole('textbox').fill('Один вопрос');
-    await page.getByRole('button', { name: 'Ask the question' }).click();
-    const stage = page.locator('.decision-stage');
-    await expect(stage).toHaveAttribute('data-scenario', route ? 'right' : 'left');
-    await expect(stage).toHaveAttribute('data-outcome', answer ? 'yes' : 'no');
-    await page.locator('form').evaluate(form => { for (let i = 0; i < 3; i++) (form as HTMLFormElement).requestSubmit(); });
-    await page.locator('canvas').evaluate(canvas => (canvas as HTMLCanvasElement).getContext('webgl2')?.getExtension('WEBGL_lose_context')?.loseContext());
-    await expect(stage).toHaveAttribute('data-renderer', 'fallback');
-    await expect(page.getByRole('status')).toHaveText(answer ? 'YES' : 'NO');
-    expect(await page.evaluate(() => (window as any).draws)).toEqual({ route: 1, answer: 1 });
-    await page.getByRole('button', { name: 'NEW QUESTION' }).click();
-    await expect(stage).toHaveAttribute('data-scenario', '');
-  }
+// Isolate each draw: every pair gets a fresh browser context and the same
+// bounded allowance for WebGL startup and loss on the software renderer.
+for (const route of [0, 1]) for (const answer of [0, 1]) {
+test(`independent route ${route} and answer ${answer} preserve the answer in fallback`, async ({ page }) => {
+  await draws(page, route, answer);
+  await page.goto('/?outcome=no&scenario=right&t=6.9');
+  await expect(page.locator('.decision-stage')).toHaveAttribute('data-phase', 'idle');
+  await page.getByRole('textbox').fill('Один вопрос');
+  await page.getByRole('button', { name: 'Ask the question' }).click();
+  const stage = page.locator('.decision-stage');
+  await expect(stage).toHaveAttribute('data-scenario', route ? 'right' : 'left');
+  await expect(stage).toHaveAttribute('data-outcome', answer ? 'yes' : 'no');
+  await page.locator('form').evaluate(form => { for (let i = 0; i < 3; i++) (form as HTMLFormElement).requestSubmit(); });
+  await page.locator('canvas').evaluate(canvas => (canvas as HTMLCanvasElement).getContext('webgl2')?.getExtension('WEBGL_lose_context')?.loseContext());
+  await expect(stage).toHaveAttribute('data-renderer', 'fallback');
+  await expect(page.getByRole('status')).toHaveText(answer ? 'YES' : 'NO');
+  expect(await page.evaluate(() => (window as any).draws)).toEqual({ route: 1, answer: 1 });
+  await page.getByRole('button', { name: 'NEW QUESTION' }).click();
+  await expect(stage).toHaveAttribute('data-scenario', '');
 });
+}
 
 test('same route has identical camera matrices for both answers across the full journey', async ({ page }) => {
-  test.setTimeout(240_000);
+  // 88 rendered states plus backward seeks on the bounded software GPU.
+  // This is a deterministic comparison, not a real-time performance test.
+  test.setTimeout(480_000);
   const capture = await webglCapture(page);
   const folder = path.join(process.env.MD_REVIEW_DIR || '.review', 'randomness');
   await mkdir(folder, { recursive: true });
@@ -118,7 +121,9 @@ test('external pool uses Math.random selection once, keeps questions private, an
   await page.locator('form').evaluate(form => { for (let i = 0; i < 4; i++) (form as HTMLFormElement).requestSubmit(); });
   await expect.poll(() => requests.length).toBe(2);
   release();
-  await expect(page.getByRole('status')).toHaveText('YES');
+  // Include cold shader compilation after the external response. Playback
+  // duration itself is checked by the animation and virtual-clock tests.
+  await expect(page.getByRole('status')).toHaveText('YES', { timeout: 20_000 });
   expect(await page.evaluate(() => (window as any).draws)).toEqual({ route: 1, answer: 0 });
   expect(requests).toHaveLength(2);
   expect(requests.every(r => !r.referer && !r.cookie && !r.body && !r.url.includes('private'))).toBe(true);
@@ -126,6 +131,9 @@ test('external pool uses Math.random selection once, keeps questions private, an
 });
 
 test('reset aborts pending external work and late completion cannot overwrite a new answer', async ({ page }) => {
+  // Two source selections, cold WebGL startup and browser teardown take more
+  // than a minute on the bounded two-CPU runner; retain every race assertion.
+  test.setTimeout(120_000);
   await draws(page, 0, 0);
   let pending: (() => Promise<void>) | undefined;
   await page.route('https://www.random.org/**', async route => {
@@ -147,6 +155,8 @@ test('reset aborts pending external work and late completion cannot overwrite a 
 });
 
 test('invalid responses and exhausted quota never silently substitute local randomness', async ({ page }) => {
+  // Four rejected pools, a complete real run, and a fresh quota check.
+  test.setTimeout(120_000);
   await draws(page, 0, 1);
   let calls = 0, response = 'not numbers';
   await page.route('https://www.random.org/**', route => {
