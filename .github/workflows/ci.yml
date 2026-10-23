@@ -18,7 +18,9 @@ jobs:
     # The public repository must never execute fork/PR code on this runner.
     if: github.repository == 'Terro216/major-decision' && github.ref == 'refs/heads/main' && github.actor == 'Terro216'
     runs-on: [self-hosted, Linux, X64, big-one, major-decision]
-    timeout-minutes: 35
+    # The full software-rendered fidelity suite exceeds the former 35 min
+    # budget once all reference captures and four-pair checks complete.
+    timeout-minutes: 60
     env:
       CI: 'true'
       NODE_OPTIONS: --max-old-space-size=768

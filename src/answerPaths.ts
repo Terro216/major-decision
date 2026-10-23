@@ -9,6 +9,15 @@ export const answerPaths = {
 } as const;
 
 export const answerLetters = {
-  yes: [{ letter: 'Y', x: 0 }, { letter: 'E', x: 108 }, { letter: 'S', x: 210 }],
-  no: [{ letter: 'N', x: 0 }, { letter: 'O', x: 114 }],
+  // Letter proportions measured separately in the settled film frames.
+  // Shared by the real extrusions and the same-answer SVG fallback.
+  yes: [
+    { letter: 'Y', x: -5.7, y: -4.2, sx: 1.06545, sy: 1.04779 },
+    { letter: 'E', x: 109.15, y: -2.3, sx: 1.04184, sy: 1.02166 },
+    { letter: 'S', x: 217.7, y: 0, sx: .92177, sy: .97682 },
+  ],
+  no: [
+    { letter: 'N', x: 3.85, y: -2.3, sx: .975, sy: 1.031915 },
+    { letter: 'O', x: 117.85, y: -1.05, sx: 1.04124, sy: 1.02381 },
+  ],
 } as const;

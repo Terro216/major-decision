@@ -4,7 +4,8 @@ import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 const root = '/artifacts/randomness';
-const build = JSON.parse(readFileSync('/artifacts/check-result.json')).indexSha256;
+const build = JSON.parse(readFileSync(process.env.MD_BUILD_REPORT || '/artifacts/check-result.json')).indexSha256;
+const mediaRoot = process.env.MD_MEDIA_DIR || '/repo/references/review/2026-10-23-release';
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
 try {
   const context = await browser.newContext({ viewport: { width: 800, height: 900 } });
@@ -61,7 +62,7 @@ try {
   await media.locator('#pause').click();
   const hashes = Object.fromEntries(['yes','no','left-no','right-yes'].map(key => {
     const name=`after-${key}.mp4`;
-    return [name, createHash('sha256').update(readFileSync(`/repo/references/review/2026-10-21-release/${name}`)).digest('hex')];
+    return [name, createHash('sha256').update(readFileSync(`${mediaRoot}/${name}`)).digest('hex')];
   }));
   writeFileSync(`${root}/playback-check.json`, JSON.stringify({ checkedAt: new Date().toISOString(), build, seeks, quarterSpeedPlayed: true, hashes }, null, 2));
   await mediaContext.close();

@@ -9,13 +9,17 @@ docker run --rm --init --name major-decision-review-export \
   --mount "type=bind,src=$PWD,dst=/repo,readonly" \
   --mount "type=bind,src=$PWD/.review,dst=/artifacts" \
   -e MD_REVIEW_DIR=/artifacts -e "MD_ARTIFACT_OWNER=$artifact_owner" \
+  -e "MD_REVIEW_FPS=${MD_REVIEW_FPS:-24}" \
+  -e "MD_PREVIEW_URL=${MD_PREVIEW_URL:-http://127.0.0.1:4175}" \
   -e NODE_OPTIONS=--max-old-space-size=768 -w /work \
   mcr.microsoft.com/playwright:v1.63.0-noble \
   bash -c '
     set -euo pipefail
     trap '\''for directory in /artifacts/export /artifacts/recordings /artifacts/randomness; do [[ ! -d "$directory" ]] || chown -R "$MD_ARTIFACT_OWNER" "$directory"; done; for f in /artifacts/playback-*-slow-raw.webm; do [[ ! -f "$f" ]] || chown "$MD_ARTIFACT_OWNER" "$f"; done'\'' EXIT
     cp /repo/package.json /repo/package-lock.json .
-    cp /repo/scripts/export-review.mjs .
+    mkdir scripts
+    cp /repo/scripts/export-review.mjs scripts/
+    cp -r /repo/src .
     npm ci --no-audit --no-fund >/tmp/major-decision-export-install.log 2>&1
-    node export-review.mjs "$@" 2>&1 | tee /artifacts/export${1:+-cross}.log
+    node scripts/export-review.mjs "$@" 2>&1 | tee /artifacts/export${1:+-cross}.log
   ' export "$@"

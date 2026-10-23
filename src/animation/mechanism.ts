@@ -1,20 +1,26 @@
 // World dimensions and centre lines used by BOTH the renderer and choreography.
 // These are a reconstruction, not measurements recovered from the film.
+import { fanCurves, fanPins, fanPoints } from './fanPath.ts';
 export type Outcome = 'yes' | 'no';
 export type Vec3 = readonly [number, number, number];
+export type Cubic = readonly [Vec3, Vec3, Vec3, Vec3];
 export const BALL_RADIUS = .58;
 export const PIN_RADIUS = .13;
-// Film pins are visibly taller than the ball diameter. Their height is a
-// reconstructed proportion, not a measured mesh, and stays constant in time.
-export const PIN_HEIGHT = 2.50;
-export const RUN_HEIGHT = .78;
+// Cap-to-base length measured independently of the reflected lower stem.
+export const PIN_HEIGHT = 1.70;
+export const RUN_HEIGHT = .80;
+export const SOURCE_SCALE = 1.13;
+// The raised ring is a flattened torus. These dimensions also define a
+// containing annular volume for conservative full-sphere clearance checks.
+export const STAR_RING = { radius: .62, radial: .055, axial: .0275, z: .21 } as const;
 // The lower mouth faces diagonally toward the end of the pin field. The
 // free approach turns onto that axis before entering the straight open lip.
 // This is one fixed layout; neither pins nor turns move with the camera.
-export const TUBE = { inner: .70, outer: .78, rim: 1.04, radius: 4.5, rise: 5.4, angle: Math.PI * 3.95, lead: 1, x: 7, y: 1.08, z: 11, yaw: 1.1 } as const;
-// Leave room behind the impact for the reference camera's pullback. With a
-// short flight that camera retreated into the outlet and looked through it.
-export const TARGET = { scale: 2, face: .20, impactDrop: .25, flight: 20.2, hit: 5.80, color: 5.93 } as const;
+export const TUBE = { inner: .70, outer: .78, rim: 1.68, radius: 5.2613648857, rise: 5.1546241097, angle: Math.PI * 3.95, lead: 1.2352442705, x: 10.3643724692, y: 1.2339671542, z: 1.6403363918, yaw: 1.6317500420 } as const;
+// The fixed target is constrained by its direct image and floor reflection.
+// `flight` is the progress coordinate used by the measured timing, not the
+// length of the curved world-space route. The last eight units are straight.
+export const TARGET = { scale: 1.9, face: .20, impactDrop: .25, flight: 20.2, center: [50.9738360956, 6.2515538554, 2.5508490987] } as const;
 export const add = (a: Vec3, b: Vec3): Vec3 => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
 export const sub = (a: Vec3, b: Vec3): Vec3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 export const mul = (a: Vec3, n: number): Vec3 => [a[0] * n, a[1] * n, a[2] * n];
@@ -23,11 +29,25 @@ export const length = (a: Vec3) => Math.hypot(...a);
 export const unit = (a: Vec3): Vec3 => mul(a, 1 / length(a));
 export const mix = (a: Vec3, b: Vec3, u: number): Vec3 => add(a, mul(sub(b, a), u));
 export const cross = (a: Vec3, b: Vec3): Vec3 => [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]];
+export function cubicAt(p: Cubic, u: number): Vec3 {
+  const v=1-u;
+  return add(add(mul(p[0],v*v*v),mul(p[1],3*v*v*u)),add(mul(p[2],3*v*u*u),mul(p[3],u*u*u)));
+}
+export function cubicSpeedBound(p: Cubic, from=0, to=1) {
+  const controls=[mul(sub(p[1],p[0]),3),mul(sub(p[2],p[1]),3),mul(sub(p[3],p[2]),3)];
+  const at=(u:number)=>mix(mix(controls[0],controls[1],u),mix(controls[1],controls[2],u),u);
+  const first=at(from),last=at(to);
+  // Exact quadratic derivative controls restricted to this parameter range.
+  // Their convex hull bounds every velocity between the sampled endpoints.
+  const tangent=mul(mix(sub(controls[1],controls[0]),sub(controls[2],controls[1]),from),2);
+  const middle=add(first,mul(tangent,(to-from)/2));
+  return Math.max(length(first),length(middle),length(last));
+}
 export const side = (outcome: Outcome) => outcome === 'yes' ? 1 : -1;
 export const fieldOffset = (outcome: Outcome): Vec3 => [-side(outcome) * 1.5, 0, -2.15];
 // The raised source belongs to the same fixed assembly as the fan. The camera
 // leaves the star above the frame without hiding its mesh or spreading the fan.
-export const sourcePosition = (outcome: Outcome): Vec3 => add([side(outcome)*.775, 5.2, -13], fieldOffset(outcome));
+export const sourcePosition = (outcome: Outcome): Vec3 => add([0, 5.245373494, -11], fieldOffset(outcome));
 export function segmentDistance(p: Vec3, a: Vec3, b: Vec3) {
   const ab = sub(b, a);
   return length(sub(p, mix(a, b, Math.max(0, Math.min(1, dot(sub(p, a), ab) / dot(ab, ab))))));
@@ -76,49 +96,55 @@ export function tubeTangent(distance: number, outcome: Outcome) {
 export function targetFrame(outcome: Outcome) {
   const forward = tubeTangent(tubeLength, outcome), normal = mul(forward, -1);
   const right = unit(cross([0, 1, 0], normal)), up = cross(normal, right);
-  const impact = add(tubePoint(tubeLength, outcome), mul(forward, TARGET.flight));
-  // The film's ball lands below the disc centre. Move the plate, not the
-  // already tangent flight: the same full sphere still meets its front plane.
-  const center = add(add(impact, mul(forward, BALL_RADIUS + TARGET.face * TARGET.scale)), mul(up, TARGET.impactDrop));
+  const center: Vec3 = [side(outcome)*TARGET.center[0],TARGET.center[1],TARGET.center[2]];
+  const impact = sub(sub(center,mul(forward,BALL_RADIUS+TARGET.face*TARGET.scale)),mul(up,TARGET.impactDrop));
   return { forward, normal, right, up, impact, center };
 }
 
-const hitXs: Record<Outcome, readonly number[]> = {
-  // The last two contacts leave the side of the fan, rather than ending
-  // among the neutral rows. The inlet remains fixed in the same world.
-  yes: [-1.0, 1.0, -1.3, .9, -1.5, 1.2, -3.0, -5.3],
-  no: [1.0, -1.1, 1.3, -.9, 1.5, -1.2, 3.0, 5.3],
-};
+// Let the whole sphere clear the real outlet before bending. Quintic blending
+// joins both straight portions with equal position, tangent and curvature.
+export const flightCurveBreaks = [1.2, TARGET.flight-8] as const;
+function flightOffset(outcome: Outcome) {
+  return sub(targetFrame(outcome).impact,add(tubePoint(tubeLength,outcome),mul(tubeTangent(tubeLength,outcome),TARGET.flight)));
+}
+export function flightPoint(distance: number, outcome: Outcome): Vec3 {
+  const [start,end]=flightCurveBreaks, u=Math.max(0,Math.min(1,(distance-start)/(end-start)));
+  const w=u**3*(10+u*(-15+6*u));
+  return add(add(tubePoint(tubeLength,outcome),mul(tubeTangent(tubeLength,outcome),distance)),mul(flightOffset(outcome),w));
+}
+// Bound |dP/dd| over a progress interval. Smootherstep's derivative increases
+// to u=.5, then decreases; outside the bend it is exactly zero.
+export function flightParameterSpeedBound(from: number, to: number, outcome: Outcome) {
+  const [start,end]=flightCurveBreaks;
+  if(to<=start||from>=end) return 1;
+  const low=Math.max(0,(from-start)/(end-start)),high=Math.min(1,(to-start)/(end-start));
+  const u=Math.max(low,Math.min(.5,high));
+  const peak=30*u*u*(1-u)*(1-u)/(end-start);
+  // The norm of axis + offset*w' is convex in w'. Its maximum over [0,peak]
+  // is at an endpoint; unlike the triangle inequality this retains direction.
+  return Math.max(1,length(add(tubeTangent(tubeLength,outcome),mul(flightOffset(outcome),peak))));
+}
+
 export type Pin = { position: Vec3; contact?: number; color?: Outcome };
 function makeField(outcome: Outcome) {
-  // Move the complete fan as one assembly, leaving a clear exit toward the
-  // lower mouth. Contacts and surrounding cylinders share this transform.
-  const offset = fieldOffset(outcome);
-  const points: Vec3[] = ([[0, RUN_HEIGHT, -5.5], ...hitXs[outcome].map((x, row): Vec3 => [x, RUN_HEIGHT, -2.5 + row * .85]), [side(outcome) * .35, RUN_HEIGHT, 6.0]] as Vec3[]).map(p => add(p,offset));
-  const colors: Outcome[] = ['no', 'no', 'no', 'yes', 'no', 'yes', 'no', outcome];
-  // Place each contacted cylinder on the bisector of the elastic rebound.
-  // The adjacent straight segments are outside its Minkowski-expanded surface.
-  const pins: Pin[] = points.slice(1, -1).map((p, i) => {
-    const incoming = unit(sub(p, points[i])), outgoing = unit(sub(points[i + 2], p));
-    const normal = unit(sub(outgoing, incoming));
-    const center = sub(p, mul(normal, BALL_RADIUS + PIN_RADIUS));
-    return { position: [center[0], 0, center[2]], contact: i + 1, color: colors[i] };
-  });
-  // Fill the surrounding triangular fan. Keep the swept sphere corridor clear;
-  // the old 1.25 grid left gaps narrower than the ball's diameter.
-  for (let row = 0; row < 8; row++) {
-    const count = row + 2;
-    for (let col = 0; col < count; col++) {
-      // The surrounding fan ends before the final contact. The previous
-      // longer rows continued beside the ball all the way toward the mouth.
-      const p: Vec3 = add([(col - (count - 1) / 2) * 1.55, RUN_HEIGHT, -3.4 + row * .95],offset);
-      if (points.slice(1).some((b, i) => segmentDistance(p, points[i], b) < BALL_RADIUS + PIN_RADIUS + .12)) continue;
-      if (pins.some(pin => Math.hypot(pin.position[0] - p[0], pin.position[2] - p[2]) < .65)) continue;
-      pins.push({ position: [p[0], 0, p[2]] });
-    }
+  const place = (p: readonly [number, number]): Vec3 => add([side(outcome)*p[0],RUN_HEIGHT,p[1]-5.5],fieldOffset(outcome));
+  const points=fanPoints.map(place);
+  const curves = new Map<number, Cubic>(fanCurves.map(({endPoint,handles}) =>
+    [endPoint,[points[endPoint-1],place(handles[0]),place(handles[1]),points[endPoint]]]));
+  const pins: Pin[]=[];
+  for(let row=0;row<6;row++) for(let col=0;col<6;col++) {
+    const p=place([(row-col)*1.3,(row+col)*1.3]);
+    pins.push({position:[p[0],0,p[2]]});
   }
-  const distances = [0];
-  for (let i = 1; i < points.length; i++) distances.push(distances[i - 1] + length(sub(points[i], points[i - 1])));
-  return { points, pins, distances, length: distances.at(-1)! };
+  const contacts=fanPins.map(([r,c])=>r*6+c);
+  const distances=[0];
+  for(let i=1;i<points.length;i++) {
+    const curve=curves.get(i);
+    // The departure has equal endpoint derivative magnitudes. Scaling its
+    // progress to that derivative preserves physical speed at both joins.
+    const span=curve?3*length(sub(curve[1],curve[0])):length(sub(points[i],points[i-1]));
+    distances.push(distances[i-1]+span);
+  }
+  return {points,curves,pins,contacts,distances,length:distances.at(-1)!};
 }
 export const fields = { yes: makeField('yes'), no: makeField('no') };

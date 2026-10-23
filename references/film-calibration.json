@@ -1,0 +1,43 @@
+{
+  "description": "Measured source-frame clock and fixed monitor rectification. Original media is unchanged.",
+  "sourceSize": [1920, 1080],
+  "sourceFps": 30,
+  "machineSize": [1600, 920],
+  "stageRect": [331, 182, 1241, 688],
+  "method": "Least-squares straight borders sampled at five times per clip. The virtual upper-left stage corner is the intersection of extrapolated straight borders, behind the curved logo cutout. A single homography per clip maps that rectangle to the native stage. No per-frame camera fitting, optical flow, speed changes or colour correction.",
+  "limitations": "CRT curvature, scanout tears and 1-3 px capture jitter remain. Extrapolated corner uncertainty is about 4 source pixels. Hidden or cropped source content is not invented.",
+  "branches": {
+    "yes": {
+      "file": "06m36s-06m50s.mp4",
+      "firstAnimationFrame": 173,
+      "sourceStageCorners": [[471.114, 359.973], [1711.885, 351.017], [475.704, 1029.385], [1709.226, 1027.816]],
+      "borderSampleTimes": [6.1, 7.6, 9.85, 11.65, 12.65],
+      "events": {
+        "ballVisible": {"frame": 188, "uncertaintyFrames": 1},
+        "firstPinColour": {"frame": 217, "uncertaintyFrames": 0},
+        "inletCrossing": {"frame": 300, "uncertaintyFrames": 1},
+        "coilColour": {"frame": 301, "uncertaintyFrames": 0},
+        "outletCrossing": {"frame": 318, "uncertaintyFrames": 1},
+        "targetContact": {"frame": 344, "uncertaintyFrames": 1},
+        "targetColour": {"frame": 348, "uncertaintyFrames": 0},
+        "answerSettled": {"frame": 377, "uncertaintyFrames": 1}
+      }
+    },
+    "no": {
+      "file": "08m35s-08m50s.mp4",
+      "firstAnimationFrame": 188,
+      "sourceStageCorners": [[485.742, 357.973], [1725.081, 350.154], [486.124, 1027.72], [1721.165, 1027.091]],
+      "borderSampleTimes": [6.6, 8.15, 10.35, 12.35, 13.5],
+      "events": {
+        "ballVisible": {"frame": 205, "uncertaintyFrames": 1},
+        "firstPinColour": {"frame": 234, "uncertaintyFrames": 0},
+        "inletCrossing": {"frame": 317, "uncertaintyFrames": 1},
+        "coilColour": {"frame": 318, "uncertaintyFrames": 0},
+        "outletCrossing": {"frame": 334, "uncertaintyFrames": 1},
+        "targetContact": {"frame": 360, "uncertaintyFrames": 1},
+        "targetColour": {"frame": 364, "uncertaintyFrames": 0},
+        "answerSettled": {"frame": 391, "uncertaintyFrames": 1}
+      }
+    }
+  }
+}

@@ -11,8 +11,8 @@ export function decisionNotes(scenario: Scenario, outcome: Outcome): Note[] {
   return [
     { time: timing[path].release, frequency: 180, endFrequency: 120, duration: .16, volume: .38, type: 'triangle' },
     ...pinContacts[path].map(([time, , color], i) => ({ time, frequency: (color === 'yes' ? 640 : 480) + i * 35, endFrequency: 260, duration: .09, volume: .22 })),
-    { time: timing[path].entry, frequency: 190, endFrequency: 920, duration: timing[path].exit - timing[path].entry, volume: .18, type: 'triangle' },
-    { time: 5.80, frequency: 150, endFrequency: 75, duration: .22, volume: .4, type: 'triangle' },
+    { time: timing[path].pulseStart, frequency: 190, endFrequency: 920, duration: timing[path].pulseEnd - timing[path].pulseStart, volume: .18, type: 'triangle' },
+    { time: timing[path].hit, frequency: 150, endFrequency: 75, duration: .22, volume: .4, type: 'triangle' },
     ...resultNotes(outcome, 6.20),
   ];
 }

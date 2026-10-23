@@ -4,28 +4,30 @@ import path from 'node:path';
 import { timing } from '../src/animation/timeline';
 import { webglCapture } from './webglCapture';
 
-test('motion snapshots: both branches, continuous target and opaque diagnostic views', async ({ page }) => {
+// Each branch captures 21 full-machine images. Give them separate bounded
+// tests: SwiftShader takes 5–9 seconds per image on the two-CPU check runner.
+for (const outcome of ['yes', 'no'] as const) {
+test(`motion snapshots: ${outcome}, continuous target and opaque diagnostic views`, async ({ page }) => {
   test.setTimeout(240_000);
   const root=path.join(process.env.MD_REVIEW_DIR||'.review','motion','after');
   await mkdir(root,{recursive:true});
   await page.setViewportSize({width:1100,height:850});
-  for(const outcome of ['yes','no'] as const) {
-    await page.goto(`/?review=1&outcome=${outcome}&t=0`);
-    await page.getByRole('button',{name:/BROWSER FRAME/}).click();
-    await expect(page.locator('.decision-stage')).toHaveAttribute('data-renderer','webgl');
-    const crop=(await page.locator('.machine').boundingBox())!;
-    for(const time of [.55,.6,.65,1.9,3.25,4.15,4.3,4.4,4.65,4.91,5.1,5.45,5.48,5.7,5.8,5.95,6.5,6.9]) {
-      await page.getByRole('slider',{name:'Animation time'}).fill(String(time));
-      await page.screenshot({clip:crop,path:path.join(root,`${outcome}-${time.toFixed(2)}.png`)});
-    }
-    await page.getByRole('checkbox',{name:'OPAQUE TUBE'}).check();
-    for(const [view,time] of [['top',3.25],['mouth',timing[outcome].entry],['side',timing[outcome].exit+.1]] as const) {
-      await page.getByLabel('Review camera').selectOption(view);
-      await page.getByRole('slider',{name:'Animation time'}).fill(String(Number(time.toFixed(2))));
-      await page.screenshot({clip:crop,path:path.join(root,`${outcome}-${view}.png`)});
-    }
+  await page.goto(`/?review=1&outcome=${outcome}&t=0`);
+  await page.getByRole('button',{name:/BROWSER FRAME/}).click();
+  await expect(page.locator('.decision-stage')).toHaveAttribute('data-renderer','webgl');
+  const crop=(await page.locator('.machine').boundingBox())!;
+  for(const time of [.55,.6,.65,1.9,3.25,4.15,4.3,4.4,4.65,4.91,5.1,5.45,5.48,5.7,5.8,5.95,6.5,6.9]) {
+    await page.getByRole('slider',{name:'Animation time'}).fill(String(time));
+    await page.screenshot({clip:crop,path:path.join(root,`${outcome}-${time.toFixed(2)}.png`)});
+  }
+  await page.getByRole('checkbox',{name:'OPAQUE TUBE'}).check();
+  for(const [view,time] of [['top',3.25],['mouth',timing[outcome].entry],['side',timing[outcome].exit+.1]] as const) {
+    await page.getByLabel('Review camera').selectOption(view);
+    await page.getByRole('slider',{name:'Animation time'}).fill(String(Number(time.toFixed(2))));
+    await page.screenshot({clip:crop,path:path.join(root,`${outcome}-${view}.png`)});
   }
 });
+}
 
 test('motion replay: quarter speed and backward seeking preserve both rendered branches', async ({ page }) => {
   test.setTimeout(180_000);

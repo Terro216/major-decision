@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import importlib.util
 import json
+import math
 import shutil
 import socket
 import subprocess
@@ -15,8 +16,12 @@ parser = argparse.ArgumentParser()
 parser.add_argument('phase', choices=['before', 'after', 'cross', 'comparisons'])
 parser.add_argument('--review-dir', default='references/review/2026-10-21-release')
 parser.add_argument('--baseline-dir', help='Use a previous review after-video as the before-video.')
+parser.add_argument('--work-dir', default='.review', help='Scratch directory containing the checked exports.')
+parser.add_argument('--calibrated-film-dir', help='Reuse the fixed-perspective film videos from a completed review.')
 args = parser.parse_args()
 phase = args.phase
+WORK = (ROOT / args.work_dir).resolve()
+assert WORK == ROOT / '.review' or WORK.is_relative_to(ROOT / '.review'), 'Scratch work stays inside .review.'
 OUT = (ROOT / args.review_dir).resolve()
 assert OUT.is_relative_to(ROOT / 'references/review'), 'Review media stays in ignored references/review.'
 if socket.gethostname() != 'big-one':
@@ -36,11 +41,12 @@ if phase in ['before', 'after', 'cross']:
     if manifest.exists():
         raise SystemExit(f'Preserve completed evidence: {manifest}. Remove only an explicitly rejected attempt before regenerating.')
     for key, frames in index['outcomes'].items():
-        assert len(frames) == 167 and frames[-1]['time'] == 6.9
+        assert index['fps'] in (24, 30)
+        assert len(frames) == math.ceil(6.9 * index['fps']) + 1 and frames[-1]['time'] == 6.9
         prefix = 'before' if phase == 'before' else 'after'
         movie = OUT / f'{prefix}-{key}.mp4'
         media.encode_frames(source / key, movie, index['fps'])
-        media.sheets(movie, f'{prefix}-{key}')
+        media.sheets(movie, f'{prefix}-{key}', index['fps'])
     manifest.write_text(json.dumps(index, indent=2) + '\n')
 else:
     if args.baseline_dir:
@@ -52,9 +58,19 @@ else:
                 assert destination.read_bytes()==(baseline/f'after-{branch}.mp4').read_bytes()
             else:
                 shutil.copy2(baseline/f'after-{branch}.mp4',destination)
+    fps = json.loads((OUT / 'after-export.json').read_text())['fps']
     for branch, clip, start, crop in [('yes','06m36s-06m50s.mp4',5.7,'1630:920:145:160'),('no','08m35s-08m50s.mp4',6.2,'1623:915:154:163')]:
-        media.run(['-ss',str(start),'-i',str(ROOT/'references/film'/clip),'-t','7.46','-vf',f'crop={crop},scale=1240:700,setsar=1',*media.ENCODE,OUT/f'film-{branch}.mp4'])
-        media.compare(branch)
+        if args.calibrated_film_dir:
+            film_dir = (ROOT / args.calibrated_film_dir).resolve()
+            assert film_dir != OUT and film_dir.is_relative_to(ROOT / 'references/review')
+            source, destination = film_dir / f'film-{branch}.mp4', OUT / f'film-{branch}.mp4'
+            if destination.exists():
+                assert destination.read_bytes() == source.read_bytes(), 'Preserve completed calibrated film evidence.'
+            else:
+                shutil.copy2(source, destination)
+        else:
+            media.run(['-ss',str(start),'-i',str(ROOT/'references/film'/clip),'-t','7.46','-vf',f'crop={crop},scale=1240:700,format=rgb24,setsar=1,{media.VIDEO_COLOR}',*media.ENCODE,OUT/f'film-{branch}.mp4'])
+        media.compare(branch, fps)
     inputs, filters = [], []
     for i,(view,branch) in enumerate((v,b) for v in ['top','mouth','side'] for b in ['yes','no']):
         inputs.extend(['-i',str(WORK/'motion/after'/f'{branch}-{view}.png')])

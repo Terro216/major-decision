@@ -3,11 +3,15 @@ import { chromium } from '@playwright/test';
 import { mkdir, writeFile, readFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
+import { phaseAt } from '../src/animation/timeline.ts';
 const root = process.env.MD_REVIEW_DIR || '.review';
 const preview = process.env.MD_PREVIEW_URL || 'http://127.0.0.1:4175';
 const cross = process.argv.includes('--cross');
 const output = cross ? path.join(root, 'randomness') : root;
-const fps = 24;
+// Use 30 fps for frame-aligned comparisons with the supplied film. Keep the
+// historical 24 fps default for existing review-package scripts.
+const fps = Number(process.env.MD_REVIEW_FPS || 24);
+if (![24, 30].includes(fps)) throw new Error('MD_REVIEW_FPS must be 24 or 30.');
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
 try {
   const checked = JSON.parse(await readFile(process.env.MD_BUILD_REPORT || path.join(root, 'check-result.json'), 'utf8'));
@@ -35,14 +39,20 @@ try {
     const count = Math.ceil(6.9 * fps) + 1;
     for (let i = 0; i < count; i++) {
       const time = Math.min(i / fps, 6.9);
-      // Preserve i/24 within 0.5 ps while using Chromium's range serialization.
-      await page.getByRole('slider', { name: 'Animation time' }).evaluate((slider, value) => {
+      // Avoid an extra decimal truncation. Chromium's native range input still
+      // rounds rational times; verify both its precision and the event state.
+      const nativeTime = await page.getByRole('slider', { name: 'Animation time' }).evaluate((slider, value) => {
         // Use the native setter and the actual React input handler, but never
         // scroll/focus a control between captures of the scaled machine.
         Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(slider, value);
         slider.dispatchEvent(new Event('input', { bubbles: true }));
-      }, String(Number(time.toFixed(12))));
+        return Number(slider.value);
+      }, String(time));
+      if (Math.abs(nativeTime-time) > 5e-13) throw new Error(`Frame ${i}: input rounded ${time} to ${nativeTime}`);
       await page.waitForFunction(expected => Math.abs(Number(document.querySelector('.decision-stage').dataset.time) - expected) < .00051, time);
+      const route = scenario === 'film' ? outcome : scenario === 'left' ? 'yes' : 'no';
+      const shot = await page.locator('.decision-stage').getAttribute('data-shot');
+      if (shot !== phaseAt(time,route)) throw new Error(`Frame ${i}: expected ${phaseAt(time,route)}, got ${shot}`);
       const bounds = await page.locator('.machine').boundingBox();
       if (Object.keys(crop).some(k => Math.abs(bounds[k] - crop[k]) > .01)) throw new Error(`Machine bounds changed at frame ${i}`);
       const scroll = await page.evaluate(() => [...document.querySelectorAll('.terminal-surface,.machine,.viewport')].map(el => [el.scrollLeft, el.scrollTop]));
@@ -87,5 +97,5 @@ try {
     console.log(`${outcome.toUpperCase()}: quarter-speed live playback reached ${samples.at(-1)?.time}s (${samples.length} observed time updates)`);
   }
   await writeFile(path.join(output, 'export', 'index.json'), JSON.stringify(index, null, 2));
-  console.log('Exported both complete timelines at 24 fps. This does not measure live GPU performance.');
+  console.log(`Exported both complete timelines at ${fps} fps. This does not measure live GPU performance.`);
 } finally { await browser.close(); }

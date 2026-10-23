@@ -1,4 +1,18 @@
+> Полный актуальный прогон r4 на big-one: **57/57 за46.1min**, source
+> `b7dedc7c39cfaecbdb08924439352378776a26598cea39abc097c3c8665d8817`.
+> Это локальный полный результат; новый GitHub CI будет запущен push.
+> Бюджет UI-теста120s и workflow60min учитывает программный рендеринг;
+> assertions и прежние лимиты2CPU/1536MiB/512PID сохранены.
+> Результаты опубликованного bee1d41 ниже исторические.
+
 # CI на big-one
+
+Актуальная проверка визуальной версии `bee1d41` —
+[run 39641569860](https://github.com/Terro216/major-decision/actions/runs/39641569860):
+48/48 за 24.1 min, все шаги успешны. Digest артефакта и 47 исходных файлов
+проверены; девять статических файлов совпали с production. Runner online/idle,
+`_work` пуст, PID peak 279, denials 0, OOM kills 0. Итоговые доказательства —
+`references/review/2026-10-21-fidelity/`; результаты 46/46 ниже исторические.
 
 Workflow `.github/workflows/ci.yml` запускает build и весь Playwright-набор
 на runner `major-decision-big-one` только для `main` и действий владельца
@@ -62,12 +76,10 @@ docker compose -f ci/compose.yaml up -d --no-build --pull never runner
 Долгоживущий PAT на сервер не устанавливается. Регистрация хранится в
 ignored `ci/.state/.secrets` с правами 0600. Это JSON-bundle трёх штатных
 файлов runner; остальные файлы его рабочего контейнера воспроизводимы.
-Имя `.secrets` входит в существующий recovery allowlist дерева `server`.
-После первой регистрации проверить включение в big-one slice collector,
-равенство приватной синхронизированной копии на DE и обновить encrypted
-recovery export по серверному runbook. DE slice намеренно собирает только
-собственные хостовые секреты; файл проекта входит через big-one slice. Загрузка нового
-зашифрованного вложения в Bitwarden выполняется владельцем через свой клиент.
+21.10 пользователь явно отменил отдельный backup и recovery export для этого
+проекта. Исходники и конфигурация сайта находятся в Git; регистрацию runner
+при утрате создают заново. Экспорт секретов и обновление Bitwarden не нужны
+и не являются условием завершения выпуска.
 
 После утраты регистрации удалить только старую запись runner в GitHub и
 зарегистрировать новую; сборка самого сайта не зависит от этой регистрации.
@@ -75,16 +87,23 @@ recovery export по серверному runbook. DE slice намеренно �
 классифицируется отдельно от web stack; restart policy обеспечивает перезапуск
 после reboot, а bootstrap не пытается зарегистрировать runner автоматически.
 
+При обновлении обоих контейнеров сначала дождаться idle и остановить только
+runner, затем обновить egress и запустить runner. Это сохраняет выход старой
+сессии до её завершения. В проходе 21 октября одновременный recreate обоих
+контейнеров сопровождался конфликтом старой сессии в течение 164 s; runner
+затем подключился с прежним ID 2 без повторной регистрации.
+
 В GitHub проверять состояние online/idle и результат job для конкретного
 commit SHA. Зелёный локальный контейнер и подготовленный YAML не доказывают
-успешный GitHub CI. Фактический run ID, SHA, network checks и backup-проверка
+успешный GitHub CI. Фактический run ID, SHA и network checks
 фиксируются в HANDOFF после выполнения.
 
 Первый реальный run выявил недостаточный лимит 256 PID: cgroup записала
 14 отказов fork/clone, Firefox упал при navigation, OOM kills = 0.
 Тот же Firefox-сценарий отдельно с виртуальным аудиовыходом прошёл (8.9 s).
-Для runner с его собственным job worker лимит увеличен до 512; standalone
-QA сохраняет прежние 256. CPU, память, seccomp, capabilities и сеть не расширены.
+Для runner с его собственным job worker лимит увеличен до 512; текущий
+`check-remote.sh` также использует 512 PID. CPU, память, seccomp,
+capabilities и сеть не расширены.
 
 Второй полный run прошёл 46/46 за 24.4 min, PID peak 277, PID denials 0,
 OOM kills 0. Workflow завершился ошибкой только в завершающем hook:
@@ -92,3 +111,9 @@ GitHub требует расширение языка в его пути. В о�
 COPY, chmod и `ACTIONS_RUNNER_HOOK_JOB_COMPLETED` используют путь
 `/usr/local/bin/major-decision-job-complete.sh`.
 Основание: [GitHub job hooks](https://docs.github.com/en/actions/how-tos/manage-runners/self-hosted-runners/run-scripts).
+
+Исправление подтверждено полным [run 39526378203](https://github.com/Terro216/major-decision/actions/runs/39526378203):
+46/46 за 24.8 min, все шаги включая hook успешны. После job runner online/idle,
+`_work` пуст, PID peak 276, PID denials 0, OOM kills 0. Артефакт сохранён
+локально в ignored review; его digest и исходники проверены, девять статических
+файлов побайтно совпали с production.

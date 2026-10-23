@@ -34,7 +34,7 @@ export function StageScreen({ screen }: { screen: Screen }) {
         </defs>
         <rect width="1244" height="688" fill="url(#answer-background)"/>
         <g transform={screen === 'yes' ? 'translate(111 135) scale(3.25)' : 'translate(267 135) scale(3.25)'}>
-          {answerLetters[screen].map(({ letter, x }) => <g key={letter} transform={`translate(${x} 0)`}>
+          {answerLetters[screen].map(({ letter, x, y, sx, sy }) => <g key={letter} transform={`translate(${x} ${y}) scale(${sx} ${sy})`}>
             <path d={answerPaths[letter]} transform="translate(3 -2)" fill={screen === 'yes' ? '#22561b' : '#711a14'} fillRule="evenodd" stroke={screen === 'yes' ? '#22561b' : '#711a14'} strokeWidth="2"/>
             <path d={answerPaths[letter]} fill={`url(#${screen}-front)`} fillRule="evenodd" stroke={screen === 'yes' ? '#75c544' : '#e84f36'} strokeWidth=".9"/>
           </g>)}
