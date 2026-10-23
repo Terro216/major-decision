@@ -2,6 +2,11 @@ import { test, expect } from '@playwright/test';
 import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
 
+// Full real-time playback includes software shader compilation and rendering.
+// Its completion can exceed the 12 s UI assertion budget on two CPUs; keep
+// every interaction/privacy assertion and a separate bounded completion wait.
+const completionTimeout = 30_000;
+
 test('empty questions are not answered; a Cyrillic question can be asked and reset', async ({ page }) => {
   await page.goto('/');
   const question = page.getByRole('textbox', { name: 'Your question' });
@@ -10,6 +15,7 @@ test('empty questions are not answered; a Cyrillic question can be asked and res
   await expect(page.getByRole('status')).toHaveCount(0);
   await question.fill('Стоит ли сегодня пойти на прогулку?');
   await question.press('Enter');
+  await expect(page.getByRole('status')).toBeVisible({ timeout: completionTimeout });
   await expect(page.getByRole('status')).toMatchAriaSnapshot('- status: /YES|NO/');
   await expect(question).toHaveValue('Стоит ли сегодня пойти на прогулку?');
   await page.getByRole('button', { name: 'NEW QUESTION' }).click();
@@ -36,7 +42,7 @@ test('multiline questions, edit after answer, and browser frame preserve the que
   await question.pressSequentially('in the Conrad Competition?');
   await expect(page.getByRole('status')).toHaveCount(0);
   await page.getByRole('button', { name: 'Ask the question' }).click();
-  await expect(page.getByRole('status')).toBeVisible();
+  await expect(page.getByRole('status')).toBeVisible({ timeout: completionTimeout });
   await page.getByRole('button', { name: /BROWSER FRAME/ }).click();
   await expect(question).toHaveValue('Should I enter a painting\nin the Conrad Competition?');
   await question.fill('A different question?');
@@ -51,7 +57,7 @@ test('all app assets are self hosted, question stays out of network and storage'
   await page.goto('/');
   await page.getByRole('textbox', { name: 'Your question' }).fill('private-question-12345');
   await page.getByRole('button', { name: 'Ask the question' }).click();
-  await expect(page.getByRole('status')).toBeVisible();
+  await expect(page.getByRole('status')).toBeVisible({ timeout: completionTimeout });
   expect(errors).toEqual([]);
   expect(requests.every(url => url.startsWith('http://127.0.0.1:4173/'))).toBe(true);
   expect(requests.some(url => url.includes('private-question'))).toBe(false);
