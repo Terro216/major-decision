@@ -35,6 +35,24 @@ function wallIndex(geometry: THREE.BufferGeometry) {
   };
 }
 
+test('transparent wall ordering exactly matches a stable depth sort for changing and reflected cameras', () => {
+  const geometry = tubeGeometry('yes'), original = Array.from(geometry.index!.array);
+  const count=original.length/3, centers=new Float32Array(count*3), positions=geometry.attributes.position;
+  for(let i=0;i<count;i++)for(let j=0;j<3;j++){
+    const v=original[i*3+j];
+    centers[i*3]+=positions.getX(v)/3;centers[i*3+1]+=positions.getY(v)/3;centers[i*3+2]+=positions.getZ(v)/3;
+  }
+  const sort=wallSorter(geometry);
+  for(const direction of [[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1],[.4,-.2,-1],[.4,.2,-1],[.99999999,1e-10,-1e-10],[.4,-.2,-1]]){
+    const vector=new THREE.Vector3(direction[0],direction[1],direction[2]).normalize(), c=vector.toArray().map(v=>Number(v.toFixed(10)));
+    const depths=Array.from({length:count},(_,i)=>centers[i*3]*c[0]+centers[i*3+1]*c[1]+centers[i*3+2]*c[2]);
+    const expected=Array.from({length:count},(_,i)=>i).sort((a,b)=>depths[b]-depths[a]||a-b).flatMap(i=>original.slice(i*3,i*3+3));
+    sort(vector);
+    expect(Array.from(geometry.index!.array)).toEqual(expected);
+  }
+  geometry.dispose();
+});
+
 // A Bezier lies inside the convex hull of its controls. Subdivision tightens
 // that hull, so this covers the complete curved corridor, not only samples.
 function certifiedCurveGap(curve: Cubic, pins: readonly {position:Vec3}[], depth=0): number {
@@ -240,9 +258,9 @@ test('motion continuity: acceleration joins the open mouths and rounded helix wi
       const sample=(time:number)=>ballAt(time,outcome);
       const jump=length(sub(second(sample,join-2*h,h),second(sample,join+2*h,h)));
       const widerJump=length(sub(second(sample,join-4*h,2*h),second(sample,join+4*h,2*h)));
-      const segment=join===t.entry?profile.segments[0]:profile.segments.at(-1)!;
-      const jerkBound=Math.max(...segment.acceleration.slice(1).map((a,i)=>
-        Math.abs(3*(a-segment.acceleration[i])/(segment.to-segment.from))));
+      const adjacent=join===t.entry?[profile.segments[0]]:[profile.segments.at(-1)!,flights[outcome].segments[0]];
+      const jerkBound=Math.max(...adjacent.flatMap(segment=>segment.acceleration.slice(1).map((a,i)=>
+        Math.abs(3*(a-segment.acceleration[i])/(segment.to-segment.from)))));
       // Both mouth neighbourhoods are straight. The derivative hull bounds
       // how much a continuous acceleration can change across this stencil.
       expect(jump,`${outcome} acceleration at ${join}`).toBeLessThan(6*h*jerkBound+.04);
@@ -267,19 +285,20 @@ test('motion continuity: acceleration joins the open mouths and rounded helix wi
     }
     expect(tubeDistanceAt(t.entry,outcome)).toBe(0);
     expect(tubeDistanceAt(t.exit,outcome)).toBeCloseTo(tubeLength,10);
+    // Repeated film exposures must no longer freeze the live sphere.
     const heldFrames=outcome==='yes'?[[132,133],[134,136],[138,140],[141,142],[143,144]]:
       [[132,133],[134,135],[136,137],[138,139],[140,141],[143,145]];
     for(const [first,last] of heldFrames) {
       const pose=ballAt(first/30,outcome);
       for(const time of [(first+last)/60,last/30])
-        expect(length(sub(ballAt(time,outcome),pose))).toBeLessThan(1e-10);
+        expect(length(sub(ballAt(time,outcome),pose))).toBeGreaterThan(1e-5);
     }
     const flightHolds=outcome==='yes'?[[147,149],[151,152],[153,155]]:
       [[147,148],[149,151],[153,154],[155,157]];
     for(const [first,last] of flightHolds) {
       const pose=ballAt(first/30,outcome);
       for(const time of [(first+last)/60,last/30])
-        expect(length(sub(ballAt(time,outcome),pose))).toBeLessThan(1e-10);
+        expect(length(sub(ballAt(time,outcome),pose))).toBeGreaterThan(1e-5);
     }
     const flightSpatial=flightCurveBreaks.map(join=>{
       const sample=(distance:number)=>flightPoint(distance,outcome);

@@ -76,7 +76,7 @@ test('same route has identical camera matrices for both answers across the full 
         const indicator = await page.locator('.indicator').innerHTML();
         if (outcome === 'yes') { matrices.push(actual); indicators.push(indicator); }
         else { expect(actual).toEqual(matrices[i]); expect(indicator).toBe(indicators[i]); }
-        if (time < 4.3) {
+        if (time < (scenario === 'left' ? 175 : 176) / 30) {
           const frame = await capture();
           if (outcome === 'yes') pixels.push(frame);
           else {
@@ -86,8 +86,9 @@ test('same route has identical camera matrices for both answers across the full 
               await writeFile(path.join(folder, `${scenario}-${time}-yes.png`), pixels[i]);
               await writeFile(path.join(folder, `${scenario}-${time}-no.png`), frame);
             }
-            // Answer geometry/reflections may differ once the distant target
-            // enters view; the camera itself must remain identical throughout.
+            // The coil, glowing sphere and reflections must not disclose the
+            // answer before the target changes color, even at the outlet.
+            expect(identical, `${scenario} reveals its answer at ${time}`).toBe(true);
           }
         }
       }

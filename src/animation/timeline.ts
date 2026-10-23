@@ -7,6 +7,7 @@ import { flightMotion } from './flightMotion.ts';
 import { buildTubeMotion } from './tubeMotion.ts';
 import { exitViews } from './exitViews.ts';
 import { bernsteinAt } from './motionCurve.ts';
+import { exposureKeys } from './exposureKeys.ts';
 export { helixPoint, type Outcome, type Vec3 } from './mechanism.ts';
 export type Phase = 'idle' | 'preparing' | 'running' | 'result';
 export type Key = readonly [number, ...number[]];
@@ -305,9 +306,9 @@ function framingAt(keys: readonly Key[], time: number, c2 = false) {
 
 function flightCamera(time: number, outcome: Outcome) {
   const f = targetFrame(outcome), ball = ballAt(time, outcome);
-  const [x,y,diameter] = framingAt(flightFraming[outcome],time,true);
+  const [x,y,diameter] = framingAt(exposureKeys(flightFraming[outcome], (a,b) => Math.abs(a[3]-b[3]) < 1e-8) as Key[],time,true);
   const [angle,elevation,fov,unmirroredRoll] = framingAt(
-    exitViews[outcome].map(([frame,a,e,fov,roll])=>[frame/30,a,e,fov,roll] as Key),time,true);
+    exposureKeys(exitViews[outcome].map(([frame,a,e,fov,roll])=>[frame/30,a,e,fov,roll])) as Key[],time,true);
   const forward = mul(unit(add(add(mul(f.forward,Math.cos(angle)),mul(f.right,side(outcome)*Math.sin(angle))),mul(f.up,elevation))),-1);
   return frameBall(ball,forward,x,y,diameter,fov,side(outcome)*unmirroredRoll);
 }

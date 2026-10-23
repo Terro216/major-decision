@@ -3,10 +3,11 @@ import { AskSymbol, Frame, MobileOrnaments } from './components/Frame';
 import { BrowserFrame } from './components/BrowserFrame';
 import { DecisionStage } from './components/DecisionStage';
 import { useDecision } from './animation/useDecision';
-import { DURATION, indicatorAt, indicatorBallsAt, phaseAt, type Outcome } from './animation/timeline';
+import { indicatorAt, indicatorBallsAt, phaseAt, type Outcome } from './animation/timeline';
 import type { ReviewView } from './animation/createScene';
 import { filmScenario, pathFor, type Scenario } from './animation/scenario';
 import type { RandomMode } from './animation/randomness';
+import type { PlaybackMode } from './animation/freestyle';
 import wordmark from './assets/wordmark-badge.svg';
 import { usePreference } from './usePreference';
 import { useSound } from './audio/useSound';
@@ -28,14 +29,16 @@ export function App() {
   const [view, setView] = useState<ReviewView>(review && ['top', 'side', 'mouth'].includes(params.get('view') || '') ? params.get('view') as ReviewView : 'film');
   const [opaque, setOpaque] = useState(review && params.get('opaque') === '1');
   const [randomMode, setRandomMode] = useState<RandomMode>('local');
+  const [playbackMode, setPlaybackMode] = useState<PlaybackMode>(review && params.get('mode') === 'freestyle' ? 'freestyle' : 'movie');
   const [reviewScenario, setReviewScenario] = useState<Scenario | 'film'>(review && ['left', 'right'].includes(params.get('scenario') || '') ? params.get('scenario') as Scenario : 'film');
   const reducedMotion = usePreference('(prefers-reduced-motion: reduce)');
   const decision = useDecision(review ? rate : 1, reducedMotion);
   const sound = useSound(decision, review ? rate : 1);
   const { phase, outcome, scenario, time, playing } = decision;
+  const visualTime = decision.freestyle?.filmTime(time) ?? time;
   const path = pathFor(scenario);
   const busy = phase === 'preparing' || phase === 'running';
-  const indicator = phase === 'running' ? indicatorAt(time, path) : null;
+  const indicator = phase === 'running' ? indicatorAt(visualTime, path) : null;
 
   useLayoutEffect(() => {
     const element = fit.current!;
@@ -50,7 +53,7 @@ export function App() {
     if (!review || !['yes', 'no'].includes(params.get('outcome') || '')) return;
     const branch = params.get('outcome') as Outcome;
     setQuestion(branch === 'yes' ? tie : competition);
-    decision.seek(branch, Number(params.get('t') ?? DURATION), reviewScenario === 'film' ? filmScenario(branch) : reviewScenario);
+    decision.seek(branch, Number(params.get('t') ?? 60), reviewScenario === 'film' ? filmScenario(branch) : reviewScenario, playbackMode, Number(params.get('seed') ?? 60) >>> 0);
   }, []);
 
   const reset = () => {
@@ -60,13 +63,13 @@ export function App() {
   };
   const ask = () => {
     if (!question.trim()) { input.current?.focus(); return; }
-    void decision.ask(randomMode);
+    void decision.ask(randomMode, playbackMode);
   };
   const reviewScreen = (next: Outcome | 'idle', animate = false) => {
     setQuestion(next === 'no' ? competition : tie);
     if (next === 'idle') decision.reset();
     else {
-      decision.seek(next, animate ? 0 : DURATION, reviewScenario === 'film' ? filmScenario(next) : reviewScenario);
+      decision.seek(next, animate ? 0 : 60, reviewScenario === 'film' ? filmScenario(next) : reviewScenario, playbackMode);
       if (animate) decision.play(next);
     }
   };
@@ -77,7 +80,7 @@ export function App() {
       <div className="terminal-surface" style={{ transform: `scale(${scale})` }}>
         {cinema && <Browser />}
         <section className="machine" aria-label="Major Decision machine">
-          <div className="viewport"><DecisionStage phase={phase} outcome={outcome} scenario={scenario} time={time} onUnavailable={decision.finish} view={view} opaque={opaque} diagnostics={review} reducedMotion={reducedMotion}/></div>
+          <div className="viewport"><DecisionStage phase={phase} outcome={outcome} scenario={scenario} time={time} freestyle={decision.freestyle} onUnavailable={decision.finish} view={view} opaque={opaque} diagnostics={review} reducedMotion={reducedMotion}/></div>
           <Shell />
           <MobileOrnaments />
           <img className="sidebar-wordmark" src={wordmark} alt="Major Decision" draggable="false"/>
@@ -92,27 +95,33 @@ export function App() {
             {['HOROSCOPE', 'ROMANCE', 'CAREER'].map(label => <button className="machine-button category-button" type="button" disabled key={label}>{label}</button>)}
           </nav>
           <div className="indicator" aria-hidden="true" data-indicator={indicator ?? 'off'}>
-            {phase === 'running' && indicatorBallsAt(time, path).map(ball => <span key={ball.key} className={`indicator-ball indicator-ball--${ball.outcome}`} style={{ left: `${ball.x / 384 * 100}%`, top: `${ball.y / 165 * 100}%`, transform: `rotate(${ball.tilt}deg)` }}><span>{ball.outcome.toUpperCase()}</span></span>)}
+            {phase === 'running' && indicatorBallsAt(visualTime, path).map(ball => <span key={ball.key} className={`indicator-ball indicator-ball--${ball.outcome}`} style={{ left: `${ball.x / 384 * 100}%`, top: `${ball.y / 165 * 100}%`, transform: `rotate(${ball.tilt}deg)` }}><span>{ball.outcome.toUpperCase()}</span></span>)}
           </div>
         </section>
       </div>
     </div>
     <div className="outside-controls">
+      <div className="mode-control" role="group" aria-label="Animation mode">
+        {(['movie', 'freestyle'] as const).map(mode => <button key={mode} type="button" aria-pressed={playbackMode === mode} onClick={() => {
+          if (mode === playbackMode) return;
+          decision.reset(); setPlaybackMode(mode);
+        }}>{mode === 'movie' ? 'Movie' : 'Freestyle'}</button>)}
+      </div>
       {review && <div className="review-controls" aria-label="Reference comparison">
         <span>REFERENCE</span>
         <button type="button" aria-pressed={phase === 'idle'} onClick={() => reviewScreen('idle')}>START</button>
         {(['yes','no'] as const).map(branch => <button key={branch} type="button" aria-pressed={phase === 'result' && outcome === branch} onClick={() => reviewScreen(branch)}>{branch.toUpperCase()}</button>)}
         {(['yes','no'] as const).map(branch => <button key={branch} type="button" onClick={() => reviewScreen(branch, true)}>PLAY {branch.toUpperCase()}</button>)}
         <button type="button" disabled={phase === 'idle' || phase === 'preparing'} onClick={() => playing ? decision.pause() : decision.play(outcome)}>{playing ? 'PAUSE' : 'RESUME'}</button>
-        <label className="review-time">TIME <input aria-label="Animation time" type="range" min="0" max={DURATION} step="any" value={time} onChange={event => decision.seek(outcome, Number(event.target.value))}/></label>
-        <output className="review-timecode" role="timer" aria-live="off">{time.toFixed(2)}s · {phase === 'idle' || phase === 'preparing' ? phase : phaseAt(time, path)}</output>
+        <label className="review-time">TIME <input aria-label="Animation time" type="range" min="0" max={decision.duration} step="any" value={time} onChange={event => decision.seek(outcome, Number(event.target.value), scenario, playbackMode)}/></label>
+        <output className="review-timecode" role="timer" aria-live="off">{time.toFixed(2)}s · {phase === 'idle' || phase === 'preparing' ? phase : phaseAt(visualTime, path)}</output>
         <label>SPEED <select aria-label="Playback speed" value={rate} onChange={event => { decision.pause(); setRate(Number(event.target.value)); }}><option value="1">1×</option><option value="0.5">½×</option><option value="0.25">¼×</option></select></label>
         <label>VIEW <select aria-label="Review camera" value={view} onChange={event => setView(event.target.value as ReviewView)}><option value="film">FILM</option><option value="top">TOP</option><option value="side">SIDE</option><option value="mouth">INLET</option></select></label>
         <label><input type="checkbox" checked={opaque} onChange={event => setOpaque(event.target.checked)}/>OPAQUE TUBE</label>
         <label>ROUTE <select aria-label="Camera scenario" value={reviewScenario} onChange={event => {
           const next = event.target.value as Scenario | 'film';
           setReviewScenario(next);
-          if (phase === 'running' || phase === 'result') decision.seek(outcome, time, next === 'film' ? filmScenario(outcome) : next);
+          if (phase === 'running' || phase === 'result') decision.seek(outcome, time, next === 'film' ? filmScenario(outcome) : next, playbackMode);
         }}><option value="film">FILM PAIR</option><option value="left">LEFT</option><option value="right">RIGHT</option></select></label>
       </div>}
       <button className="frame-toggle" type="button" aria-pressed={cinema} onClick={() => setCinema(!cinema)}>BROWSER FRAME <span>{cinema ? 'ON' : 'OFF'}</span></button>

@@ -3,9 +3,10 @@ import { createScene, type ReviewView } from '../animation/createScene';
 import { phaseAt, type Outcome, type Phase } from '../animation/timeline';
 import { StageScreen } from './StageScreen';
 import { pathFor, type Scenario } from '../animation/scenario';
+import type { FreestyleRun } from '../animation/freestyle';
 
-type Props = { phase: Phase; outcome: Outcome; scenario: Scenario; time: number; onUnavailable: () => void; view?: ReviewView; opaque?: boolean; diagnostics?: boolean; reducedMotion?: boolean };
-export function DecisionStage({ phase, outcome, scenario, time, onUnavailable, view = 'film', opaque = false, diagnostics = false, reducedMotion = false }: Props) {
+type Props = { phase: Phase; outcome: Outcome; scenario: Scenario; time: number; freestyle?: FreestyleRun | null; onUnavailable: () => void; view?: ReviewView; opaque?: boolean; diagnostics?: boolean; reducedMotion?: boolean };
+export function DecisionStage({ phase, outcome, scenario, time, freestyle = null, onUnavailable, view = 'film', opaque = false, diagnostics = false, reducedMotion = false }: Props) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const scene = useRef<ReturnType<typeof createScene> | null>(null);
   const unavailable = useRef(onUnavailable);
@@ -26,13 +27,14 @@ export function DecisionStage({ phase, outcome, scenario, time, onUnavailable, v
     };
   }, [active, reducedMotion]);
   useLayoutEffect(() => {
-    try { scene.current?.render(time, outcome, scenario, view, opaque); }
+    try { scene.current?.render(time, outcome, scenario, view, opaque, freestyle); }
     catch { setFallback(true); unavailable.current(); }
     if (diagnostics && canvas.current && scene.current) canvas.current.dataset.camera = JSON.stringify(scene.current.cameraPose());
-  }, [time, outcome, active, view, opaque, scenario, diagnostics]);
+  }, [time, outcome, active, view, opaque, scenario, diagnostics, freestyle]);
   useEffect(() => { if (fallback) scene.current?.dispose(); }, [fallback]);
 
-  return <div className="decision-stage" style={{ '--finish': Math.min(1, Math.max(0, (time - 5.5) / .5)) } as React.CSSProperties} data-phase={phase} data-outcome={active ? outcome : ''} data-scenario={active ? scenario : ''} data-time={time.toFixed(3)} data-shot={active ? phaseAt(time, pathFor(scenario)) : 'idle'} data-view={view} data-opaque={opaque} data-renderer={!active ? 'svg' : reducedMotion ? 'reduced-motion' : fallback ? 'fallback' : 'webgl'}>
+  const visualTime = freestyle?.filmTime(time) ?? time;
+  return <div className="decision-stage" style={{ '--finish': Math.min(1, Math.max(0, (visualTime - 5.5) / .5)) } as React.CSSProperties} data-phase={phase} data-mode={freestyle ? 'freestyle' : 'movie'} data-seed={freestyle?.seed} data-outcome={active ? outcome : ''} data-scenario={active ? scenario : ''} data-time={time.toFixed(3)} data-shot={active ? phaseAt(visualTime, pathFor(scenario)) : 'idle'} data-view={view} data-opaque={opaque} data-renderer={!active ? 'svg' : reducedMotion ? 'reduced-motion' : fallback ? 'fallback' : 'webgl'}>
     {!active ? <StageScreen screen="idle"/> : reducedMotion ? <StageScreen screen={outcome}/> : <>
       <canvas className="scene-canvas" ref={canvas} aria-hidden="true" style={{ visibility: fallback ? 'hidden' : 'visible' }}/>
       {fallback && <div className="stage-fallback"><StageScreen screen={outcome}/></div>}

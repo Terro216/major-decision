@@ -22,6 +22,11 @@ as the visual authority. Do not replace the design with a contemporary dashboard
 - Reference media stays in ignored `references/film/`, outside `public/` and
   the production build. `references/manifest.json` records original hashes.
 - No account or question storage is needed. Questions stay in browser memory.
+- Movie and Freestyle are both live 3D modes. Movie chooses one of the two
+  authored trajectories; Freestyle uses a new seeded collision simulation.
+  Keep answer selection independent and withhold answer colors until the target.
+- Do not blur the whole interface or crop the lower oval to imitate the filmed
+  monitor. Clarity and the full usable case take priority after user feedback.
 
 ## Development
 
