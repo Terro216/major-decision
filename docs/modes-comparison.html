@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="ru">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Major Decision — Movie / Freestyle</title>
+<style>
+  :root{color-scheme:dark;font:16px/1.5 system-ui,sans-serif;background:#091326;color:#dbe7f4}
+  body{max-width:1100px;margin:32px auto;padding:0 16px}h1{font-size:26px}h2{font-size:20px;margin-top:32px}
+  a{color:#b3d9ff}p{max-width:80ch}.screens,.sequences{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+  figure{margin:0}img{display:block;width:100%;height:auto}video{display:block;width:320px;max-width:100%;background:#030714}
+  figcaption{margin:8px 0;font-size:14px;color:#bbcde2}.controls{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin:20px 0}
+  button,select{font:inherit;color:inherit;background:#173658;border:1px solid #7194b8;border-radius:4px;min-height:44px;padding:7px 12px;cursor:pointer}
+  :focus-visible{outline:3px solid #ffe28a;outline-offset:3px}.sequences{max-width:660px}small{color:#bbcde2}
+  @media(max-width:650px){.screens,.sequences{grid-template-columns:1fr}}
+</style>
+<h1>Major Decision — Movie / Freestyle</h1>
+<p>Оба режима в приложении — живая 3D-сцена. Эти короткие видео сохранены только для проверки движения: 30 кадров в секунду, исходный темп, без звука. Разрешение экспорта 320 × 178; оно не задаёт качество сцены на сайте и не измеряет FPS устройства.</p>
+<p><a href="MODES_REVIEW.md">Что изменилось и как проверено</a> · <a href="HANDOFF.md">Статус выпуска</a> · <a href="https://decision.ilyamedve.dev">Работающий сайт</a></p>
+<h2>Корпус до и после</h2>
+<div class="screens">
+  <figure><img src="../references/review/2026-10-23-modes/before/desktop-idle.png" alt="Прежний интерфейс: размытый корпус и обрезанный нижний овал"><figcaption>До: production 3ac676a.</figcaption></figure>
+  <figure><img src="../references/review/2026-10-23-modes/visual/idle-1365.png" alt="Чёткий интерфейс с полным нижним овалом и переключателем Movie / Freestyle"><figcaption>После: общий blur снят, нижний край помещается внутри корпуса.</figcaption></figure>
+</div>
+<div class="controls">
+  <button type="button" id="play">Сначала — все четыре</button>
+  <button type="button" id="pause">Пауза</button>
+  <label>Скорость <select id="rate"><option value="1">1×</option><option value="0.5">½×</option><option value="0.25">¼×</option></select></label>
+</div>
+<h2>Movie</h2>
+<p>Две фиксированные траектории по фильму. Повторённые экспозиции больше не останавливают шар. Цвет трубы одинаков при YES и NO до раскрытия ответа.</p>
+<div class="sequences">
+  <figure><video controls playsinline preload="metadata" src="../references/review/2026-10-23-modes/sequences/movie-left.mp4"></video><figcaption>Левый маршрут → YES, 6.9 s.</figcaption></figure>
+  <figure><video controls playsinline preload="metadata" src="../references/review/2026-10-23-modes/sequences/movie-right.mp4"></video><figcaption>Правый маршрут → NO, 6.9 s.</figcaption></figure>
+</div>
+<h2>Freestyle</h2>
+<p>Два примера случайного движения. Отскоки определяются настоящими контактами; seed позволяет воспроизвести путь. Каждый маршрут также может закончиться другим ответом.</p>
+<div class="sequences">
+  <figure><video controls playsinline preload="metadata" src="../references/review/2026-10-23-modes/sequences/freestyle-left.mp4"></video><figcaption>Левый ракурс, seed 60 → YES.</figcaption></figure>
+  <figure><video controls playsinline preload="metadata" src="../references/review/2026-10-23-modes/sequences/freestyle-right.mp4"></video><figcaption>Правый ракурс, seed 2 → NO.</figcaption></figure>
+</div>
+<p><small>На конце каждого видео добавлено удержание 0.5 s. Фильмы, сравнения и этот review не входят в production build.</small></p>
+<script>
+  const videos=[...document.querySelectorAll('video')];
+  document.querySelector('#play').onclick=()=>{for(const video of videos){video.currentTime=0;void video.play();}};
+  document.querySelector('#pause').onclick=()=>videos.forEach(video=>video.pause());
+  document.querySelector('#rate').onchange=event=>videos.forEach(video=>video.playbackRate=Number(event.target.value));
+</script>
+</html>
