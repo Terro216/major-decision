@@ -87,14 +87,15 @@ SSH shim его нужно передать в удалённое окружен
 
 ## Откат и восстановление
 
-Текущий выпуск Movie / Freestyle, ревизия `67e6e63`:
-`major-decision:release-modes-20261023`. `latest` указывает на тот же image.
-Прежняя production-версия `3ac676a` сохранена как
-`major-decision:rollback-modes-20261023`.
+Текущий выпуск плавности и камеры Freestyle, ревизия `2f3907f`:
+`major-decision:release-playback-r2-20261024`. `latest` указывает на тот же image.
+Прежняя production-версия `fd4d984` с аналитикой сохранена как
+`major-decision:rollback-playback-20261024` (image `sha256:7bd5d48346d0ac4a2ca5d335ba3e336d4aa90e0104b7d7fa3237ec5e26bf3e65`).
 Для отката на big-one присвоить этому сохранённому образу `major-decision:latest`,
 затем выполнить адресный `compose up` для `web` и публичный smoke. Точные
 image/source/HTML hashes и результаты текущего выпуска — в HANDOFF.
-Более старый `bee1d41` также сохранён под `major-decision:rollback-perceptual-20261023`.
+Старые production rollback tags, включая `rollback-modes-20261023` и
+`rollback-perceptual-20261023`, также сохранены.
 
 При обновлении выбрать прежний сохранённый image tag и повторить адресный
 `compose up` выше. При первом выпуске остановить и удалить только сервис
@@ -109,7 +110,7 @@ Dockerfile, nginx.conf, Compose и сети `caddy_net`; затем build → sc
 сайту не нужно. Film originals нужны для художественной сверки, а не для
 сборки/работы сайта; хранить их отдельно, с исходным manifest.
 
-Выпуск 23.10.2026 проверен по публичному HTTPS; точные hashes, production
+Выпуск 24.10.2026 проверен по публичному HTTPS; точные hashes, production
 smoke, мониторинг, CI и границы проверки записаны в HANDOFF. Регистрация
 отдельного CI-runner хранится в локальном ignored bundle и описана в CI.md.
 Пользователь отменил отдельный backup/recovery export: после утраты

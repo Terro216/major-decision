@@ -1,8 +1,28 @@
 # CI на big-one
 
-## Movie / Freestyle
+## Плавность и камера Freestyle — текущая версия
 
-Актуальный [CI 40026615698](https://github.com/Terro216/major-decision/actions/runs/40026615698)
+[CI 40104957491](https://github.com/Terro216/major-decision/actions/runs/40104957491)
+для `2f3907fa7b70263ace073758d027f4ab7a28219a` прошёл **74/74 за 37.8 min**.
+Все шаги, upload и cleanup успешны 24 октября 2026 в 15:38 UTC.
+Source: `85ad87127c3f01880c4228220da0e76af5f27bf048d9522a13fb0289075c84c3`.
+HTML: `3ca9313b0b87deb79738f99c11504c37e0fdb5cf119ca873a64907947f1915c8`.
+Все 66 inputs сверены на DE и big-one; 12 app-файлов совпали с Docker-образом
+и публичным HTTPS. Digest/CRC ZIP проверены на обоих хостах.
+Артефакт `12565282742`, 3 088 890 bytes, SHA-256
+`90fb1811addd514c0f46ef20a897f65170b8ef3fb6112ec31a05509e28c4db6b`.
+Материалы: `references/review/2026-10-24-playback/ci/`.
+
+Runner после job: running / 0 restarts, `_work` пуст, PID peak 279,
+PID denials 0, OOM/OOM kills 0. Memory max events 2117 — накопленный счётчик
+давления, не OOM. Лимиты 2 CPU / 1536 MiB / 512 PID; Docker socket отсутствует,
+сеть только isolated. Предыдущий run `40104359022` намеренно отменён перед
+исправлением стыков камеры и не считается полным успехом.
+Публикация и cleanup завершены: [HANDOFF](HANDOFF.md).
+
+## Исторический выпуск Movie / Freestyle
+
+[CI 40026615698](https://github.com/Terro216/major-decision/actions/runs/40026615698)
 для `67e6e637b506c9bbf12063624dec4fb8425c3238` прошёл **71/71 за 37.8 min**.
 Все шаги, upload и cleanup hook завершились успешно 23 октября 2026 UTC.
 Source fingerprint — `3edc0d858f9a90e8716179faa5e2efa8c68d97215b480f78787998fef2fa6061`,
