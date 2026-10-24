@@ -181,7 +181,7 @@ export function createFreestyle(seed: number, scenario: Scenario) {
     return mul(travel(follow[i],follow[i+1],velocity(i),velocity(i+1),i/cameraHz,(i+1)/cameraHz,time),
       1 - smooth((time - (inletTime - .30)) / .30));
   };
-  const cameraAt = (time: number): number[] => {
+  const rawCameraAt = (time: number): number[] => {
     const visual = filmTime(time), p = ballAt(time);
     const original = filmCameraAt(visual, path);
     if (time < inletTime) {
@@ -205,6 +205,26 @@ export function createFreestyle(seed: number, scenario: Scenario) {
       return [...add(p, offset), ...add(p, targetOffset), startView[6] + (endView[6] - startView[6]) * u, 0];
     }
     return original;
+  };
+  // Different physical phases run at different speeds from the film clock.
+  // Join their camera rigs through short C1 moves, including the outlet roll
+  // and impact view, rather than changing derivatives at a single frame.
+  const joins = [0, fieldStart, fieldEnd, inletTime, exit, hit, duration];
+  const cameraMoves = joins.slice(1, -1).map((time, i) => {
+    const radius = Math.min(.12, (time - joins[i]) / 4, (joins[i + 2] - time) / 4);
+    const from = time - radius, to = time + radius, h = 1e-5;
+    const a = rawCameraAt(from), b = rawCameraAt(to);
+    const derivative = (at: number) => {
+      const before = rawCameraAt(at - h), after = rawCameraAt(at + h);
+      return before.map((value, j) => (after[j] - value) / (2 * h));
+    };
+    return { from, to, a, b, va: derivative(from), vb: derivative(to) };
+  });
+  const cameraAt = (time: number): number[] => {
+    const move = cameraMoves.find(move => time >= move.from && time <= move.to);
+    if (!move) return rawCameraAt(time);
+    return move.a.map((value, i) => travel([value, 0, 0], [move.b[i], 0, 0],
+      [move.va[i], 0, 0], [move.vb[i], 0, 0], move.from, move.to, time)[0]);
   };
   return { seed: seed >>> 0, scenario, duration, events, contacts, ballAt, rotationAt, cameraAt, filmTime, timeAtFilm,
     guidePoint, guideLength: approachLength, launchAttempts: run.attempt + 1, speed };

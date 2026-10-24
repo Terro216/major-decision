@@ -113,6 +113,8 @@ test('freestyle follows the film lens and orbit without jerking the camera at ph
   for (const route of ['left','right'] as const) for (const seed of [0,1,2,7,60,1024]) {
     const run=createFreestyle(seed,route), path=route==='left'?'yes':'no';
     for (let time=run.events.fieldStart;time<run.events.fieldEnd;time+=.037) {
+      // The short joins blend clock rates; the rest retains the exact film rig.
+      if (time-run.events.fieldStart<.15 || run.events.fieldEnd-time<.15) continue;
       const actual=run.cameraAt(time),film=cameraAt(run.filmTime(time),path);
       expect(actual[6]).toBeCloseTo(film[6],10);
       expect(actual[7]).toBeCloseTo(film[7],10);
@@ -120,7 +122,7 @@ test('freestyle follows the film lens and orbit without jerking the camera at ph
       expect(direction(actual).distanceTo(direction(film))).toBeLessThan(1e-10);
       expect(run.cameraAt(time)).toEqual(actual);
     }
-    for (const {time} of run.contacts) {
+    for (const time of [...run.contacts.map(c=>c.time),...['fieldStart','fieldEnd','entry','exit','hit'].map(key=>run.events[key as keyof typeof run.events])]) {
       const h=1e-5,a=run.cameraAt(time-h),b=run.cameraAt(time),c=run.cameraAt(time+h);
       for(let i=0;i<6;i++) expect(Math.abs((c[i]-b[i])-(b[i]-a[i]))/h).toBeLessThan(.03);
     }
