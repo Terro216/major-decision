@@ -157,27 +157,42 @@ export function createFreestyle(seed: number, scenario: Scenario) {
     while (hi-lo > 1) { const mid = (lo+hi) >>> 1; if (spinTimes[mid] < time) lo = mid; else hi = mid; }
     return new Quaternion().slerpQuaternions(rotations[lo],rotations[hi],(time-spinTimes[lo])/(spinTimes[hi]-spinTimes[lo]));
   };
+  // Retain the film's lens, orbit, roll and ball composition. Translate that
+  // rig to the seeded path instead of switching to a wide overhead camera.
+  // A short symmetric filter absorbs the velocity reversals at impacts.
+  // Bake it once so live frames and reverse seeks need no stateful tracking.
+  const cameraHz = 120, filterRadius = 18;
+  const offsets = Array.from({ length: Math.ceil(inletTime * cameraHz) + 1 }, (_, i) => {
+    const time = Math.min(inletTime, i / cameraHz);
+    return sub(ballAt(time), filmBallAt(filmTime(time), path));
+  });
+  const follow = offsets.map((_, i) => {
+    let sum: Vec3 = [0, 0, 0], total = 0;
+    for (let k = -filterRadius; k <= filterRadius; k++) {
+      const weight = 1 + Math.cos(Math.PI * k / (filterRadius + 1));
+      sum = add(sum, mul(offsets[Math.max(0, Math.min(offsets.length - 1, i + k))], weight));
+      total += weight;
+    }
+    return mul(sum, 1 / total);
+  });
+  const followAt = (time: number) => {
+    const i = Math.min(follow.length - 2, Math.max(0, Math.floor(time * cameraHz)));
+    const velocity = (n: number) => mul(sub(follow[Math.min(follow.length - 1,n+1)],follow[Math.max(0,n-1)]),cameraHz/2);
+    return mul(travel(follow[i],follow[i+1],velocity(i),velocity(i+1),i/cameraHz,(i+1)/cameraHz,time),
+      1 - smooth((time - (inletTime - .30)) / .30));
+  };
   const cameraAt = (time: number): number[] => {
     const visual = filmTime(time), p = ballAt(time);
     const original = filmCameraAt(visual, path);
-    // During billiards, hold a broad view of the real field instead of
-    // chasing every impact. A gentle dolly follows forward progress only.
-    const progress = Math.min(1, Math.max(0, (time - fieldStart) / (fieldEnd - fieldStart)));
-    const aim: Vec3 = [-1.5 * sign, .6, -5 + 8 * smooth(progress)];
-    const wide = [...add(aim, [sign * -6, 14, 14]), ...aim, 45, 0];
-    if (time < fieldEnd) {
-      const blend = smooth((time - .65) / .5);
-      // The free launch descends along a different path from the authored
-      // film launch. Translate its opening camera with the actual sphere
-      // before blending to the broad field view, so it never leaves the shot.
-      const offset = sub(p, filmBallAt(visual, path));
-      const opening = original.map((v, i) => i < 6 ? v + offset[i % 3] : v);
-      return opening.map((v, i) => v + (wide[i] - v) * blend);
-    }
     if (time < inletTime) {
-      const inletView = filmCameraAt(filmTiming[path].entry, path);
-      const blend = smooth((time - fieldEnd) / (inletTime - fieldEnd));
-      return wide.map((v, i) => v + (inletView[i] - v) * blend);
+      const offset = followAt(time);
+      // Leave a little room for the filtered camera to follow a random
+      // rebound while keeping the whole sphere inside the film-style shot.
+      const room = .10 * smooth((time - .65) / .45)
+        * (1 - smooth((time - (inletTime - .60)) / .60));
+      return original.map((value, i) => i < 6
+        ? value + offset[i % 3] + (i < 3 ? (value - original[i + 3]) * room : 0)
+        : value);
     }
     if (time < exit) return original;
     if (time < hit) {

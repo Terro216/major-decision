@@ -2,6 +2,37 @@ import { test, expect, type Page } from '@playwright/test';
 import { createFreestyle } from '../src/animation/freestyle';
 import { webglCapture } from './webglCapture';
 
+test('answer reveal and reverse seek need no new shader programs after scene preparation', async ({ page }) => {
+  test.setTimeout(180_000);
+  await page.addInitScript(() => {
+    (window as any).shaderWork = { linkProgram: 0, getProgramInfoLog: 0, getShaderInfoLog: 0 };
+    for (const name of ['linkProgram', 'getProgramInfoLog', 'getShaderInfoLog'] as const) {
+      const original = WebGL2RenderingContext.prototype[name];
+      (WebGL2RenderingContext.prototype as any)[name] = function (...args: any[]) {
+        (window as any).shaderWork[name]++;
+        return (original as any).apply(this, args);
+      };
+    }
+  });
+  for (const outcome of ['yes', 'no']) {
+    if (outcome === 'no') await page.addInitScript(() => {
+      const extension = WebGL2RenderingContext.prototype.getExtension;
+      WebGL2RenderingContext.prototype.getExtension = function (name: string) {
+        return name === 'EXT_color_buffer_float' ? null : extension.call(this, name);
+      };
+    });
+    await page.goto(`/?review=1&outcome=${outcome}&scenario=film&t=0`);
+    await expect(page.locator('.decision-stage')).toHaveAttribute('data-renderer', 'webgl');
+    const initial = await page.evaluate(() => (window as any).shaderWork);
+    expect(initial.linkProgram).toBeGreaterThan(0);
+    for (const time of ['4.5', '5.8', '6.2', '6.5', '6.9', '4.5', '6.3']) {
+      await page.getByRole('slider', { name: 'Animation time' }).fill(time);
+      await expect(page.locator('.decision-stage')).toHaveAttribute('data-time', Number(time).toFixed(3));
+      expect(await page.evaluate(() => (window as any).shaderWork), `${outcome} at ${time}`).toEqual(initial);
+    }
+  }
+});
+
 async function choose(page: Page, route: number, answer: number, seed = 60) {
   await page.addInitScript(({ route, answer, seed }) => {
     const original = crypto.getRandomValues.bind(crypto);

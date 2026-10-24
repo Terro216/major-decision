@@ -204,6 +204,13 @@ export function createScene(canvas: HTMLCanvasElement) {
     gl_FragColor = vec4(mix(horizon,radiance,(1.-finish)*farEdge*exp(-length(floorView)/mix(100.,10.,finish))*(1.-openingCut*(1.-farLight))),1.);
   `);
   floor.rotation.x = -Math.PI / 2;
+  const reflect = floor.onBeforeRender;
+  floor.onBeforeRender = function (...args) {
+    // At finish=1 the floor shader is exactly the backdrop: reflection has
+    // zero weight. Keep its surface/depth, but stop rendering an unseen second
+    // scene. Seeking back immediately refreshes the reflection again.
+    if (mirror.uniforms.finish.value < 1) reflect.apply(this, args);
+  };
   world.add(floor);
   const pool = new THREE.PointLight('#e59ce9', .6, 24, 1.8);
   pool.position.set(-1, 3, -5);
@@ -587,6 +594,37 @@ export function createScene(canvas: HTMLCanvasElement) {
   const observer = new ResizeObserver(() => resize());
   observer.observe(canvas);
   resize(false);
+  // Prepare even the off-screen answer materials before playback starts.
+  // compile() alone leaves driver initialization until their first draw,
+  // which otherwise stalls the final rise. Warm the actual geometry and
+  // programs in a tiny private target with the scene's linear color space.
+  const warmup = new THREE.WebGLRenderTarget(1, 1, {
+    type: radiance ? THREE.HalfFloatType : THREE.UnsignedByteType,
+  });
+  const culled: THREE.Object3D[] = [];
+  scene.traverse(object => {
+    if (object.frustumCulled) { culled.push(object); object.frustumCulled = false; }
+  });
+  floor.visible = false;
+  const prepare = () => {
+    renderer.compile(scene, camera);
+    renderer.render(scene, camera);
+    ball.material = glowingBallMaterial;
+    renderer.compile(ball, camera, scene);
+    renderer.render(scene, camera);
+    ball.material = ballMaterial;
+  };
+  renderer.setRenderTarget(warmup); prepare();
+  // Without HDR the main pass uses sRGB while reflections remain linear.
+  // Warm that variant too, synchronously before the first visible paint.
+  if (!radiance) {
+    renderer.setSize(1, 1, false); renderer.setRenderTarget(null); prepare();
+  }
+  for (const object of culled) object.frustumCulled = true;
+  floor.visible = true;
+  renderer.setRenderTarget(null);
+  warmup.dispose();
+  if (!radiance) resize(false);
   return {
     render,
     cameraPose: () => ({ position: camera.position.toArray(), quaternion: camera.quaternion.toArray(), projection: camera.projectionMatrix.toArray() }),
