@@ -21,7 +21,8 @@ Dockerfile закрепляет Node 22 и nginx по digest. Контекст �
 Nginx работает как `nginx`, с readonly root, `/tmp` на tmpfs 16 MiB,
 без Linux capabilities, с `no-new-privileges`, лимитами 0.5 CPU / 64 MiB /
 64 PID. `/healthz` возвращает `ok`. Access log выключен; CSP допускает
-локальные ресурсы и опциональный `https://www.random.org` для fetch.
+локальные ресурсы, `https://analytics.ilyamedve.dev` для счётчика посещений
+и опциональный `https://www.random.org` для fetch.
 HTML и release metadata не кешируются; именованные хешем assets кешируются
 как immutable. Методы кроме GET/HEAD запрещены, неизвестные пути дают 404.
 
