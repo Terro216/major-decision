@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { createFreestyle } from '../src/animation/freestyle';
 import { BALL_RADIUS, fields, length, sub, dot, PIN_HEIGHT, PIN_RADIUS, targetFrame } from '../src/animation/mechanism';
-import { timing, tubeDistanceAt, flights, cameraUp } from '../src/animation/timeline';
+import { timing, tubeDistanceAt, flights, cameraUp, cameraAt, revealRise, DURATION } from '../src/animation/timeline';
 import * as THREE from 'three';
 import { decisionNotes } from '../src/audio/DecisionAudio';
 
@@ -59,17 +59,23 @@ test('freestyle: both routes retain the same seed on reverse seek and join witho
 test('freestyle: moving ball stays in the camera from release through pins, guide, coil and flight', () => {
   for (const scenario of ['left', 'right'] as const) for (let seed=0;seed<100;seed++) {
     const run = createFreestyle(seed, scenario), camera = new THREE.PerspectiveCamera(45, 1241 / 688, .1, 2000);
-    let maximum=0, worstTime=0, nearest=Infinity, farthest=-Infinity;
+    let maximum=0, worstTime=0, nearest=Infinity, farthest=-Infinity, sphereGap=Infinity;
     for (let time = run.events.release; time < run.events.hit; time += .025) {
       const c = run.cameraAt(time); camera.fov=c[6];camera.updateProjectionMatrix();
       camera.position.fromArray(c); camera.up.fromArray(cameraUp(c)); camera.lookAt(c[3], c[4], c[5]); camera.updateMatrixWorld();
       const p = new THREE.Vector3(...run.ballAt(time)).project(camera);
+      const local = new THREE.Vector3(...run.ballAt(time)).applyMatrix4(camera.matrixWorldInverse);
+      const vertical = Math.tan(c[6]*Math.PI/360), horizontal = vertical*camera.aspect;
+      sphereGap=Math.min(sphereGap,
+        (-local.z*horizontal-Math.abs(local.x))/Math.hypot(1,horizontal)-BALL_RADIUS,
+        (-local.z*vertical-Math.abs(local.y))/Math.hypot(1,vertical)-BALL_RADIUS);
       const extent=Math.max(Math.abs(p.x),Math.abs(p.y));
       if(extent>maximum){maximum=extent;worstTime=time;}
       nearest=Math.min(nearest,p.z);farthest=Math.max(farthest,p.z);
     }
     expect(maximum,`${scenario} seed ${seed} at ${worstTime}`).toBeLessThan(.95);
     expect(nearest).toBeGreaterThan(-1);expect(farthest).toBeLessThan(1);
+    expect(sphereGap,`${scenario} seed ${seed}: full sphere margin`).toBeGreaterThanOrEqual(0);
   }
 });
 
@@ -88,5 +94,35 @@ test('freestyle sound follows actual contacts and keeps the result chord after i
     expect(notes.at(-4)!.time).toBeCloseTo(run.events.hit, 8);
     expect(notes.at(-3)!.time).toBeGreaterThan(run.events.color);
     expect(notes.at(-1)!.time).toBeLessThan(run.duration);
+  }
+});
+
+test('result camera rises continuously through duplicated film exposures and settles at the same endpoint', () => {
+  for (const route of ['yes','no'] as const) {
+    const end = route === 'yes' ? 6.8 : 202/30;
+    for (let time=6.05;time<end-1/120;time+=1/240) {
+      expect(revealRise(time+1/240,route)-revealRise(time,route),`${route} at ${time}`).toBeGreaterThan(1e-7);
+    }
+    expect(revealRise(DURATION,route)).toBeCloseTo(9.7,10);
+    const before=cameraAt(DURATION-1e-4,route),endPose=cameraAt(DURATION,route);
+    expect(before).toEqual(endPose);
+  }
+});
+
+test('freestyle follows the film lens and orbit without jerking the camera at physical contacts', () => {
+  for (const route of ['left','right'] as const) for (const seed of [0,1,2,7,60,1024]) {
+    const run=createFreestyle(seed,route), path=route==='left'?'yes':'no';
+    for (let time=run.events.fieldStart;time<run.events.fieldEnd;time+=.037) {
+      const actual=run.cameraAt(time),film=cameraAt(run.filmTime(time),path);
+      expect(actual[6]).toBeCloseTo(film[6],10);
+      expect(actual[7]).toBeCloseTo(film[7],10);
+      const direction=(p:number[])=>new THREE.Vector3(p[3]-p[0],p[4]-p[1],p[5]-p[2]).normalize();
+      expect(direction(actual).distanceTo(direction(film))).toBeLessThan(1e-10);
+      expect(run.cameraAt(time)).toEqual(actual);
+    }
+    for (const {time} of run.contacts) {
+      const h=1e-5,a=run.cameraAt(time-h),b=run.cameraAt(time),c=run.cameraAt(time+h);
+      for(let i=0;i<6;i++) expect(Math.abs((c[i]-b[i])-(b[i]-a[i]))/h).toBeLessThan(.03);
+    }
   }
 });

@@ -315,7 +315,8 @@ function flightCamera(time: number, outcome: Outcome) {
 
 // The rectified film holds the plate size while the answer enters at its final
 // size. A vertical move fits both; the former late dolly made the letters swell.
-// These keys retain the source's held poses without discontinuous frame jumps.
+// These are measured exposures. Playback interpolates their group midpoints,
+// so duplicated film frames do not turn the final rise into 100 ms pauses.
 const revealWordScale = 22*Math.tan(38*Math.PI/360)/550;
 const revealWords = (frames: readonly (readonly [number, number])[], bottom: number): Key[] =>
   frames.map(([frame,y])=>[frame/30,9.2+(y-bottom)*revealWordScale]);
@@ -324,6 +325,10 @@ export const revealFraming: Record<Outcome, readonly Key[]> = {
     ...revealWords([[188,27],[191,27],[192,117],[193,117],[194,205],[197,205],[198,281],[199,339],[200,339],[201,375],[203,375],[204,393]],393)],
   no: [[timing.no.hit,0],[173/30,0],[174/30,-.4206404831],[175/30,-.4206404831],[176/30,.1080067931],[177/30,.1080067931],[178/30,.32],[179/30,.32],[180/30,.70],[181/30,.70],[182/30,1.20],[183/30,1.20],[184/30,1.86],[185/30,1.86],[186/30,2.83],[187/30,2.83],[188/30,3.66],[189/30,3.66],
     ...revealWords([[190,101],[191,189],[193,189],[194,267],[195,267],[196,329],[197,371],[199,371],[200,393],[201,399],[203,399]],399)],
+};
+const revealMotion = {
+  yes: exposureKeys(revealFraming.yes),
+  no: exposureKeys(revealFraming.no),
 };
 
 // Whole source poses hold after contact. These inferred settling parameters
@@ -341,7 +346,11 @@ export const targetCameraSettling: Record<Outcome, readonly Key[]> = {
 
 // Keep the same measured rise for lighting and framing, including reverse seek.
 export function revealRise(time: number, outcome: Outcome) {
-  return track(revealFraming[outcome],time)[0]+.50*smooth((time-6.03)/(188/30-6.03));
+  const observed = track(revealFraming[outcome],time)[0];
+  const continuous = framingAt(revealMotion[outcome],time,true)[0];
+  // Retain the brief impact/settling shot, then make one uninterrupted lift.
+  return observed + (continuous-observed)*smooth((time-5.95)/.10)
+    + .50*smooth((time-6.03)/(188/30-6.03));
 }
 
 function targetRevealAngle(time: number, outcome: Outcome) {
