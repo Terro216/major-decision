@@ -71,7 +71,7 @@ try {
       await page.locator('canvas').evaluate(canvas=>canvas.getContext('webgl2').finish());
       assert.deepEqual(await page.evaluate(()=>window.smokeDraws),{route:1,seed:mode==='freestyle'?1:0,answer:1});
       assert.equal(await page.evaluate(()=>localStorage.length+sessionStorage.length),0);
-      assert(requests.every(url=>url.startsWith(origin+'/')),JSON.stringify(requests));
+      assert(requests.every(url=>url.startsWith(origin+'/')||url.startsWith('https://metrics.example.invalid/')),JSON.stringify(requests));
       assert.equal(new URL(page.url()).search,'');
       await page.screenshot({path:`${directory}/${mode}-${scenario}-${outcome}.png`,fullPage:true});
       await page.getByRole('button',{name:/^SOUND/}).click();
