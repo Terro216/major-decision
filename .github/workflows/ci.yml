@@ -28,9 +28,11 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          fetch-depth: 2
+          fetch-depth: 0
       - name: Check public repository contents
-        run: python3 scripts/check-public.py
+        run: |
+          python3 scripts/test-public-check.py
+          python3 scripts/check-public.py --history
       - name: Select browser checks
         id: scope
         env:
@@ -44,7 +46,8 @@ jobs:
           browser = os.environ['EVENT_NAME'] != 'push' or parent.returncode != 0
           if not browser:
               names = subprocess.check_output(['git', 'diff', '--name-only', before, 'HEAD'], text=True).splitlines()
-              browser = any(not name.endswith('.md') and not name.startswith(('docs/', 'references/')) for name in names)
+              runtime_files = {'package.json', 'package-lock.json', 'index.html', 'vite.config.ts', 'tsconfig.json', 'playwright.config.ts', 'Dockerfile', 'nginx.conf', '.dockerignore', 'docker-compose.yml', 'scripts/check-ci.sh', 'scripts/build-metadata.mjs', 'scripts/configure-nginx.mjs'}
+              browser = any(name.startswith(('src/', 'public/', 'tests/', 'ci/')) or name in runtime_files for name in names)
           with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
               output.write(f'browser={str(browser).lower()}\n')
           PYTHON

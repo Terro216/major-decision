@@ -2,6 +2,7 @@
 """Check public files without embedding the private identifiers being blocked."""
 import argparse
 import hashlib
+import io
 from pathlib import Path
 import re
 import subprocess
@@ -16,7 +17,9 @@ PRIVATE_KEY = re.compile(rb'-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----')
 def violations(name, data):
     issues = []
     path = Path(name)
-    if '.local' in path.parts or (path.name.startswith('.env') and path.name != '.env.example'):
+    if ('.local' in path.parts or '.state' in path.parts
+            or path.name in {'.secrets', '.credentials', '.credentials_rsaparams', '.runner'}
+            or (path.name.startswith('.env') and path.name != '.env.example')):
         issues.append('private configuration is tracked')
     if b'\0' in data:
         return issues
@@ -29,9 +32,33 @@ def violations(name, data):
     return issues
 
 
+def check_history():
+    rows = subprocess.check_output(['git', 'rev-list', '--objects', 'HEAD']).splitlines()
+    objects = [row.partition(b' ') for row in rows]
+    result = subprocess.run(['git', 'cat-file', '--batch'],
+                            input=b'\n'.join(row[0] for row in objects) + b'\n',
+                            stdout=subprocess.PIPE, check=True)
+    stream = io.BytesIO(result.stdout)
+    failures = []
+    checked = 0
+    for oid, _, name in objects:
+        actual, kind, size = stream.readline().split()
+        assert actual == oid
+        data = stream.read(int(size))
+        assert stream.read(1) == b'\n'
+        if kind not in (b'blob', b'commit', b'tag'):
+            continue
+        checked += 1
+        label = name.decode() if name else kind.decode()
+        for issue in violations(label, data):
+            failures.append(f'history {oid[:12].decode()} {label}: {issue}')
+    return checked, failures
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--staged', action='store_true', help='Inspect the index instead of working files')
+    parser.add_argument('--history', action='store_true', help='Also inspect every object reachable from HEAD')
     args = parser.parse_args()
     names = subprocess.check_output(['git', 'ls-files', '-z']).decode().split('\0')
     failures = []
@@ -47,10 +74,14 @@ def main():
         checked += 1
         for issue in violations(name, data):
             failures.append(f'{name}: {issue}')
+    if args.history:
+        historical_count, historical_failures = check_history()
+        failures.extend(historical_failures)
+        checked += historical_count
     if failures:
         print('Public repository check failed:\n' + '\n'.join(failures), file=sys.stderr)
         return 1
-    print(f'Public repository check passed ({checked} tracked files).')
+    print(f'Public repository check passed ({checked} files/objects).')
     return 0
 
 

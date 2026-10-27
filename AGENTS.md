@@ -10,7 +10,7 @@ Keep documentation portable and focused on the product. Never commit private
 service addresses, machine names, personal filesystem paths, infrastructure
 inventories, credentials or operational journals. Environment-specific notes
 and configuration belong in ignored .local/ and environment files.
-Run python3 scripts/check-public.py before committing.
+Run python3 scripts/check-public.py --staged --history before committing.
 
 ## Product decisions
 

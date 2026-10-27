@@ -13,6 +13,10 @@ Register the runner using a short-lived repository registration token passed on 
 to ci/runner.py. The credentials directory is ignored by Git. Do not publish tokens,
 runner identities, host details or operational records.
 
-Every run checks tracked files for private metadata, builds TypeScript/Vite and runs
-the browser scenarios. Test artifacts are retained for seven days. Deployment is
+Every run checks tracked files and the complete reachable history for private
+metadata, including a regression test for disclosures removed only from the latest
+commit. Changes to the application, browser tests or build inputs also run the
+TypeScript/Vite build and browser suite. Documentation and privacy-check changes
+run the hygiene checks without repeating an unchanged browser suite. Manual runs
+always include the complete browser suite. Test artifacts are retained for seven days. Deployment is
 separate from CI. Public logs must not contain deployment-specific configuration.
