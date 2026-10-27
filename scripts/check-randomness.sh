@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")/.."
-[[ "$(docker info --format '{{.Name}}')" == build-host ]] || exit 1
+source scripts/host-guard.sh
+md_require_docker_host
 artifact_owner="$(node -e 'console.log(process.getuid()+":"+process.getgid())')"
 docker run --rm --init --name major-decision-randomness-check --network=host \
   --cpus=2 --memory=1024m --shm-size=256m --pids-limit=256 --security-opt no-new-privileges:true \

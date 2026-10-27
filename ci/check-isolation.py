@@ -22,6 +22,7 @@ for url in ['https://api.github.com/meta', 'http://172.17.0.1:2375/']:
     checks.append({'url': url, 'directAccess': False, 'confirmed': True})
 assert os.getuid() == 1001
 assert not Path('/var/run/docker.sock').exists()
+assert not Path('/repo').exists()
 assert not Path('/workspace').exists()
 capabilities = next(line.split()[1] for line in Path('/proc/self/status').read_text().splitlines() if line.startswith('CapEff:'))
 assert int(capabilities, 16) == 0

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compress the unmodified Liberation font on build-host with fontTools/Brotli."""
+"""Compress the unmodified Liberation font on the configured build host with fontTools/Brotli."""
 import argparse
 from pathlib import Path
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Encode both cross combinations on build-host after export-review.sh --cross."""
+"""Encode both cross combinations on the configured build host after export-review.sh --cross."""
 import hashlib,json,subprocess
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]

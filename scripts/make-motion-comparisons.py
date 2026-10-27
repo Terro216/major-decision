@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Film / preserved before / after. Run with ffmpeg on build-host only."""
+"""Film / preserved before / after. Run with ffmpeg on the configured build host only."""
 import json
 import subprocess
 from pathlib import Path

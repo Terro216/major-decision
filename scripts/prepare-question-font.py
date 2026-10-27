@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build the local webfont on build-host using fontTools (no glyph subsetting)."""
+"""Build the local webfont on the configured build host using fontTools (no glyph subsetting)."""
 import argparse
 from pathlib import Path
 from fontTools.ttLib import TTFont

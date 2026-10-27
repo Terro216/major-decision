@@ -15,5 +15,5 @@ COPY squid.conf /etc/major-decision-squid.conf
 RUN chmod 0755 /usr/local/bin/major-decision-runner /usr/local/bin/major-decision-job-complete.sh
 USER pwuser
 ENV ACTIONS_RUNNER_HOOK_JOB_COMPLETED=/usr/local/bin/major-decision-job-complete.sh \
-    MD_EXECUTION_HOST=build-host NODE_OPTIONS=--max-old-space-size=768
+    MD_CI_RUNNER=1 NODE_OPTIONS=--max-old-space-size=768
 ENTRYPOINT ["/usr/local/bin/major-decision-runner"]

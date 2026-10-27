@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Film / before material refinement / current, using ffmpeg on build-host."""
+"""Film / before material refinement / current, using ffmpeg on the configured build host."""
 import argparse
 import json
 import subprocess

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Film / previous geometry-safe version / current framing. Run on build-host."""
+"""Film / previous geometry-safe version / current framing. Run on the configured build host."""
 import json
 import subprocess
 from pathlib import Path

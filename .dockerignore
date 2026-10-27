@@ -10,3 +10,6 @@
 !src/**
 !public/
 !public/**
+
+!scripts/
+!scripts/configure-nginx.mjs

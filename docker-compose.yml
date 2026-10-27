@@ -1,7 +1,11 @@
 name: major-decision
 services:
   web:
-    build: .
+    build:
+      context: .
+      args:
+        VITE_METRICS_SITE_HOST: ${VITE_METRICS_SITE_HOST:-}
+        VITE_METRICS_SCRIPT_URL: ${VITE_METRICS_SCRIPT_URL:-}
     image: major-decision:${MAJOR_DECISION_TAG:-latest}
     container_name: major-decision
     restart: unless-stopped
@@ -33,3 +37,4 @@ services:
 networks:
   proxy:
     external: true
+    name: ${MD_PROXY_NETWORK:?Set the reverse proxy network in .env}

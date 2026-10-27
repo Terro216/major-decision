@@ -10,5 +10,5 @@ if (operation === 'inputs') {
   writeFileSync(path.join(artifacts, 'build-inputs.json'), JSON.stringify({ files: inputs, sourceSha256: hash(JSON.stringify(inputs)) }, null, 2));
 } else {
   const inputs = JSON.parse(readFileSync(path.join(artifacts, 'build-inputs.json')));
-  writeFileSync(path.join(artifacts, 'check-result.json'), JSON.stringify({ checkedAt: new Date().toISOString(), host: 'build-host', testExit: Number(status), selection: selection.length ? selection : ['all'], sourceSha256: inputs.sourceSha256, indexSha256: hash(readFileSync(path.join(root,'dist/index.html'))) }, null, 2));
+  writeFileSync(path.join(artifacts, 'check-result.json'), JSON.stringify({ checkedAt: new Date().toISOString(), execution: 'isolated', testExit: Number(status), selection: selection.length ? selection : ['all'], sourceSha256: inputs.sourceSha256, indexSha256: hash(readFileSync(path.join(root,'dist/index.html'))) }, null, 2));
 }

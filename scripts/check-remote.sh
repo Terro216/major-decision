@@ -1,10 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")/.."
-if [[ "$(docker info --format '{{.Name}}')" != build-host ]]; then
-  echo 'Use the Docker SSH shim targeting build-host.' >&2
-  exit 1
-fi
+source scripts/host-guard.sh
+md_require_docker_host
 # Source is mounted read-only. Dependencies and compilation stay in this bounded
 # disposable container; only review artifacts are written back to the checkout.
 review_dir="${MD_CHECK_DIR:-.review}"

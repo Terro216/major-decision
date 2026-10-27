@@ -10,3 +10,9 @@ __pycache__/
 references/film/
 references/review/
 ci/.state/
+
+# Local configuration and private maintenance records
+.local/
+.env
+.env.*
+!.env.example

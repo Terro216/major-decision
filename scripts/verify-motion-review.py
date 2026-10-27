@@ -2,7 +2,7 @@
 """Collect compact evidence, then verify it without keeping disposable .review.
 
 Run locally, where the Git index is authoritative. --collect requires the full
-build-host cycle and an explicitly written visual-review.json after actual viewing.
+the configured build host cycle and an explicitly written visual-review.json after actual viewing.
 The default verifies retained evidence and current sources without rendering.
 """
 import argparse
@@ -55,7 +55,7 @@ def main():
         assert len(checks['rawFrames']) == 668
         # dist is deliberately excluded from workstation synchronization.
         # check-preview.mjs hashes the actual index and every served asset on
-        # build-host; keep its independent report beside the build result.
+        # the configured build host; keep its independent report beside the build result.
         assert checks['preview-check.json']['indexSha256'] == checks['check-result.json']['indexSha256']
         (OUT / 'verification.json').write_text(json.dumps(checks, indent=2) + '\n')
 

@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """Rectify the filmed monitor once per clip, preserving the 30 fps source clock.
 
-Run on build-host. Calibration is ordinary versioned JSON; copyrighted film and
+Run on the configured build host. Calibration is ordinary versioned JSON; copyrighted film and
 derived videos remain in ignored references/review, outside public and builds.
 """
 import argparse
 import hashlib
 import json
-import socket
+from host_guard import require_host
 import subprocess
 from pathlib import Path
 
@@ -63,8 +63,7 @@ def main():
     parser.add_argument('--output', default='references/review/2026-10-21-perceptual')
     parser.add_argument('--duration', type=float, default=7.4)
     args = parser.parse_args()
-    if socket.gethostname() != 'build-host':
-        raise SystemExit('Video processing must run on build-host.')
+    require_host()
     output = (ROOT / args.output).resolve()
     assert output.is_relative_to(ROOT / 'references/review')
     output.mkdir(parents=True, exist_ok=True)

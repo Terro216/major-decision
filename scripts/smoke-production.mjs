@@ -1,4 +1,4 @@
-// Run in a bounded Playwright container on build-host, against the actual nginx
+// Run in a bounded Playwright container on the configured build host, against the actual nginx
 // candidate or public HTTPS. Questions here are synthetic and never transmitted.
 import { chromium } from '@playwright/test';
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 const [base, directory, expectedFile] = process.argv.slice(2);
 assert(base && directory, 'usage: smoke-production.mjs URL ARTIFACT_DIRECTORY [check-result.json]');
 const origin = new URL(base).origin;
+const metricsOrigin = process.env.MD_METRICS_ORIGIN ? new URL(process.env.MD_METRICS_ORIGIN).origin : null;
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 const expected = expectedFile ? JSON.parse(await readFile(expectedFile, 'utf8')) : null;
 if (expected) assert.equal(expected.testExit, 0, 'Only a passed build is a release candidate');
@@ -71,7 +72,7 @@ try {
       await page.locator('canvas').evaluate(canvas=>canvas.getContext('webgl2').finish());
       assert.deepEqual(await page.evaluate(()=>window.smokeDraws),{route:1,seed:mode==='freestyle'?1:0,answer:1});
       assert.equal(await page.evaluate(()=>localStorage.length+sessionStorage.length),0);
-      assert(requests.every(url=>url.startsWith(origin+'/')||url.startsWith('https://metrics.example.invalid/')),JSON.stringify(requests));
+      assert(requests.every(url=>url.startsWith(origin+'/')||(metricsOrigin && new URL(url).origin === metricsOrigin)),JSON.stringify(requests));
       assert.equal(new URL(page.url()).search,'');
       await page.screenshot({path:`${directory}/${mode}-${scenario}-${outcome}.png`,fullPage:true});
       await page.getByRole('button',{name:/^SOUND/}).click();

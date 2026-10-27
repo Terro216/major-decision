@@ -29,12 +29,12 @@ elif operation == 'register':
     if not token or not token.isalnum():
         raise SystemExit('A repository registration token is required on stdin.')
     result = subprocess.run(['./config.sh', '--unattended', '--url', 'https://github.com/Terro216/major-decision', '--token', token,
-                             '--name', 'major-decision-build-host', '--labels', 'build-host,major-decision', '--work', '_work'], capture_output=True, text=True)
+                             '--name', 'major-decision-ci', '--labels', 'major-decision', '--work', '_work'], capture_output=True, text=True)
     if result.returncode:
         print((result.stdout+result.stderr).replace(token, '[REDACTED]'), file=sys.stderr)
         raise SystemExit(result.returncode)
     save()
-    print('Registered major-decision-build-host; credentials saved privately.')
+    print('Registered major-decision-ci; credentials saved privately.')
 elif operation == 'run':
     data = json.loads(bundle.read_text())
     assert sorted(data) == sorted(names)

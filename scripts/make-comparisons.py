@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run on build-host after check-remote. Uses only stdlib and the host's ffmpeg.
+"""Run on the configured build host after check-remote. Uses only stdlib and the host's ffmpeg.
 Writes review artifacts; never writes original references or public assets.
 """
 import json

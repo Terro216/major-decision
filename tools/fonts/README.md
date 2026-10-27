@@ -5,7 +5,7 @@ oval-warped SVG lettering. Source: Google Fonts `ofl/alfaslabone`, fetched
 2026-10-17. Its OFL license is included. The film's exact lettering has not been
 identified; this is a reconstruction, not a recovered original logo file.
 
-Run `node scripts/make-wordmark.mjs` on build-host to regenerate
+Run `node scripts/make-wordmark.mjs` to regenerate
 `src/assets/wordmark.svg` after changing its projection. The TTF is a development
 source and does not enter the public bundle.
 
@@ -15,7 +15,7 @@ the original film font has not been identified. The unmodified TTF comes from
 the preview image's `fonts-liberation` package. Its SIL OFL license is in
 `public/fonts/Liberation-LICENSE.txt`.
 
-Run `python3 scripts/prepare-liberation-font.py` on build-host with fontTools and
+Run `python3 scripts/prepare-liberation-font.py` with fontTools and
 Brotli to rebuild the public WOFF2. It preserves all 2602 glyphs, character
 coverage, advances, layout and font names, and verifies them after compression.
 The 370196-byte TTF remains a development source; the 141228-byte WOFF2 is

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Verify the already-reviewed phase-2 evidence; does not render or approve it.
 
-Run in the local Git checkout after build-host checks/export/media preparation and
+Run in the local Git checkout after the configured build host checks/export/media preparation and
 manual image review. The visual-review manifest must be written after viewing.
 """
 import hashlib

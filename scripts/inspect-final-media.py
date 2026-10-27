@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Probe final videos and decode inspection sheets on build-host.
+"""Probe final videos and decode inspection sheets on the configured build host.
 
 This creates evidence to inspect; it does not mark images as visually reviewed.
 """

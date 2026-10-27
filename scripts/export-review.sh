@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")/.."
-[[ "$(docker info --format '{{.Name}}')" == build-host ]] || { echo 'Use the Docker SSH shim targeting build-host.' >&2; exit 1; }
+source scripts/host-guard.sh
+md_require_docker_host
 artifact_owner="$(node -e 'console.log(process.getuid() + ":" + process.getgid())')"
 docker run --rm --init --name major-decision-review-export \
   --cpus=2 --memory=1536m --shm-size=256m --pids-limit=256 \

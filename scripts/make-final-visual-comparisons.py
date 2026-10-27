@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """All original stills and complete movies / preserved baseline / current.
 
-Run on build-host, after the full checks and deterministic export. No image from
+Run on the configured build host, after the full checks and deterministic export. No image from
 the film is ever copied into the application or its production build.
 """
 import json

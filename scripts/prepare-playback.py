@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Encode deterministic review frames and matching reference excerpts on build-host."""
+"""Encode deterministic review frames and matching reference excerpts on the configured build host."""
 import json
 import subprocess
 from pathlib import Path

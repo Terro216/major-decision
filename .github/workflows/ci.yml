@@ -3,7 +3,6 @@ name: CI
 on:
   push:
     branches: [main]
-    paths-ignore: ['**/*.md', 'docs/**', 'references/**']
   workflow_dispatch:
 
 permissions:
@@ -17,22 +16,43 @@ jobs:
   check:
     # The public repository must never execute fork/PR code on this runner.
     if: github.repository == 'Terro216/major-decision' && github.ref == 'refs/heads/main' && github.actor == 'Terro216'
-    runs-on: [self-hosted, Linux, X64, build-host, major-decision]
+    runs-on: [self-hosted, Linux, X64, major-decision]
     # The full software-rendered fidelity suite exceeds the former 35 min
     # budget once all reference captures and four-pair checks complete.
     timeout-minutes: 60
     env:
       CI: 'true'
       NODE_OPTIONS: --max-old-space-size=768
-      MD_EXECUTION_HOST: build-host
+      MD_CI_RUNNER: '1'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 2
+      - name: Check public repository contents
+        run: python3 scripts/check-public.py
+      - name: Select browser checks
+        id: scope
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          python3 - <<'PYTHON'
+          import os, subprocess
+          before = os.environ.get('BEFORE_SHA', '')
+          parent = subprocess.run(['git', 'cat-file', '-e', before + '^{commit}'], capture_output=True)
+          browser = os.environ['EVENT_NAME'] != 'push' or parent.returncode != 0
+          if not browser:
+              names = subprocess.check_output(['git', 'diff', '--name-only', before, 'HEAD'], text=True).splitlines()
+              browser = any(not name.endswith('.md') and not name.startswith(('docs/', 'references/')) for name in names)
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write(f'browser={str(browser).lower()}\n')
+          PYTHON
       - name: Build and exercise all browser scenarios
+        if: steps.scope.outputs.browser == 'true'
         run: bash scripts/check-ci.sh
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        if: always()
+        if: always() && steps.scope.outputs.browser == 'true'
         with:
           name: major-decision-check-${{ github.sha }}
           retention-days: 7

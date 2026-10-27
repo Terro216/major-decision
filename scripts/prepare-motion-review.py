@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Compact film/before/after evidence. Run on build-host; retain movies, not raw frames."""
+"""Compact film/before/after evidence. Run on the configured build host; retain movies, not raw frames."""
 import argparse
 import hashlib
 import json
 import shutil
-import socket
+from host_guard import require_host
 import subprocess
 from pathlib import Path
 
@@ -64,8 +64,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('phase', choices=['before', 'after', 'cross', 'comparisons'])
     args = parser.parse_args()
-    if socket.gethostname() != 'build-host':
-        raise SystemExit('Run media preparation on build-host.')
+    require_host()
     OUT.mkdir(parents=True, exist_ok=True)
     if args.phase == 'before' and (OUT / 'before-export.json').exists():
         raise SystemExit('The saved before export is immutable; start a new dated review for another baseline.')

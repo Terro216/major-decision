@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Bounded ffmpeg inspection on build-host; approximate screen-space evidence only."""
+"""Bounded ffmpeg inspection on the configured build host; approximate screen-space evidence only."""
 import json
 import subprocess
 from pathlib import Path

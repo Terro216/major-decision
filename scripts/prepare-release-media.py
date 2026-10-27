@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Prepare the current release comparisons on build-host without overwriting old evidence."""
+"""Prepare the current release comparisons on the configured build host without overwriting old evidence."""
 import argparse
 import hashlib
 import importlib.util
 import json
 import math
 import shutil
-import socket
+from host_guard import require_host
 import subprocess
 from pathlib import Path
 
@@ -24,8 +24,7 @@ WORK = (ROOT / args.work_dir).resolve()
 assert WORK == ROOT / '.review' or WORK.is_relative_to(ROOT / '.review'), 'Scratch work stays inside .review.'
 OUT = (ROOT / args.review_dir).resolve()
 assert OUT.is_relative_to(ROOT / 'references/review'), 'Review media stays in ignored references/review.'
-if socket.gethostname() != 'build-host':
-    raise SystemExit('Run media preparation on build-host.')
+require_host()
 spec = importlib.util.spec_from_file_location('media', ROOT / 'scripts/prepare-motion-review.py')
 media = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(media)

@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")/.."
-[[ "${MD_EXECUTION_HOST:-}" == build-host ]] || { echo 'CI builds and browsers belong on build-host.' >&2; exit 1; }
+[[ "${MD_CI_RUNNER:-}" == 1 ]] || { echo 'Use the dedicated CI runner image.' >&2; exit 1; }
+python3 scripts/check-public.py
 mkdir -p .review
 export MD_REVIEW_DIR="$PWD/.review"
 # The dedicated runner image provides Playwright browsers and PulseAudio.

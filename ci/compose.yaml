@@ -1,7 +1,7 @@
 name: major-decision-ci
 services:
   egress:
-    image: major-decision-ci:20261021-hook
+    image: major-decision-ci:20261027-public
     container_name: major-decision-ci-egress
     user: "1001:1001"
     entrypoint: [squid, -N, -f, /etc/major-decision-squid.conf]
@@ -19,7 +19,7 @@ services:
       options: {max-size: 5m, max-file: "2"}
   runner:
     build: .
-    image: major-decision-ci:20261021-hook
+    image: major-decision-ci:20261027-public
     container_name: major-decision-ci-runner
     user: "1001:1001"
     restart: unless-stopped
@@ -50,7 +50,7 @@ networks:
     driver_opts:
       com.docker.network.bridge.gateway_mode_ipv4: isolated
     ipam:
-      config: [{subnet: 192.0.2.0/28}]
+      config: [{subnet: "${MD_CI_ISOLATED_SUBNET:?Set an unused isolated subnet in ci/.env}"}]
   egress:
     ipam:
-      config: [{subnet: 192.0.2.16/28}]
+      config: [{subnet: "${MD_CI_EGRESS_SUBNET:?Set an unused egress subnet in ci/.env}"}]

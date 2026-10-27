@@ -1,4 +1,4 @@
-// Bounded visual iteration on build-host. Run inside the existing preview container.
+// Bounded visual iteration on the configured build host. Run inside the existing preview container.
 import { chromium } from '@playwright/test';
 import { mkdir, writeFile } from 'node:fs/promises';
 const directory = process.argv[2] || '/artifacts/visual-iteration';
