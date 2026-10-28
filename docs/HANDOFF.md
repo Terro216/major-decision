@@ -1,12 +1,27 @@
 # Project status
 
 Movie and Freestyle are implemented, with independent route/answer selection,
-Cyrillic input, optional sound and accessible fallback behavior. This maintenance
-pass preserves scene geometry, camera paths and animation timing.
+Cyrillic input, optional sound and accessible fallback behavior.
+
+Freestyle now uses a continuous camera sweep through the pin field, spiral and
+target. Camera movement and aiming follow the ball with different smoothing
+windows, so rebounds remain visible without jolting the entire view. Shot
+transitions share velocity and acceleration; short approaches have extra turning
+time. The seed adds restrained framing variation. Movie, collision geometry,
+answer selection and sound timing are unchanged.
 
 Public documentation contains product and portable development information.
 Deployment-specific configuration and historical working notes are kept outside Git.
 Analytics is optional and configured at build time; a fresh clone sends no analytics.
+
+## Camera verification — 28 October 2026
+
+The TypeScript/Vite build and eight camera/trajectory regression tests pass.
+Coverage includes 100 seeds on each route with the complete ball inside the frame,
+reverse seeking, repeatable camera poses, bounded camera acceleration and banking,
+opening/result framing and physical contact timing. Complete browser CI and the
+final visual comparison are pending. No application deployment or user visual
+acceptance is claimed.
 
 ## Verification — 27 October 2026
 

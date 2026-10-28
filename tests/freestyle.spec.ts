@@ -109,22 +109,53 @@ test('result camera rises continuously through duplicated film exposures and set
   }
 });
 
-test('freestyle follows the film lens and orbit without jerking the camera at physical contacts', () => {
-  for (const route of ['left','right'] as const) for (const seed of [0,1,2,7,60,1024]) {
+test('freestyle camera preserves opening and result, and restores the same pose on reverse seek', () => {
+  for (const route of ['left','right'] as const) for (const seed of [0,1,2,7,60,63,97,1024]) {
     const run=createFreestyle(seed,route), path=route==='left'?'yes':'no';
-    for (let time=run.events.fieldStart;time<run.events.fieldEnd;time+=.037) {
-      // The short joins blend clock rates; the rest retains the exact film rig.
-      if (time-run.events.fieldStart<.15 || run.events.fieldEnd-time<.15) continue;
-      const actual=run.cameraAt(time),film=cameraAt(run.filmTime(time),path);
-      expect(actual[6]).toBeCloseTo(film[6],10);
-      expect(actual[7]).toBeCloseTo(film[7],10);
-      const direction=(p:number[])=>new THREE.Vector3(p[3]-p[0],p[4]-p[1],p[5]-p[2]).normalize();
-      expect(direction(actual).distanceTo(direction(film))).toBeLessThan(1e-10);
-      expect(run.cameraAt(time)).toEqual(actual);
+    for (const [time,filmTime] of [[0,0],[run.duration,DURATION]]) {
+      run.cameraAt(time).forEach((value,i)=>expect(value).toBeCloseTo(cameraAt(filmTime,path)[i],9));
     }
-    for (const time of [...run.contacts.map(c=>c.time),...['fieldStart','fieldEnd','entry','exit','hit'].map(key=>run.events[key as keyof typeof run.events])]) {
+    const times=Array.from({length:31},(_,i)=>run.duration*i/30), poses=times.map(time=>run.cameraAt(time));
+    for (let i=times.length-1;i>=0;i--) expect(run.cameraAt(times[i])).toEqual(poses[i]);
+    const repeat=createFreestyle(seed,route);
+    times.forEach((time,i)=>expect(repeat.cameraAt(time)).toEqual(poses[i]));
+    for (const time of [...run.contacts.map(c=>c.time),...Object.values(run.events)]) {
       const h=1e-5,a=run.cameraAt(time-h),b=run.cameraAt(time),c=run.cameraAt(time+h);
-      for(let i=0;i<6;i++) expect(Math.abs((c[i]-b[i])-(b[i]-a[i]))/h).toBeLessThan(.03);
+      for(let i=0;i<8;i++) expect(Math.abs((c[i]-b[i])-(b[i]-a[i]))/h).toBeLessThan(.03);
     }
+  }
+});
+
+test('freestyle camera limits banking and acceleration throughout the shot, not only at phase joins', () => {
+  // Regress the old film-clock changes and bounce-following jolts. A smooth
+  // position alone is insufficient: aiming can still whip the view around.
+  const hz=120;
+  for (const route of ['left','right'] as const) for (const seed of [0,1,2,7,60,63,97,1024]) {
+    const run=createFreestyle(seed,route), camera=new THREE.PerspectiveCamera();
+    let previousPosition: THREE.Vector3 | undefined, previousRotation: THREE.Quaternion | undefined;
+    let velocity: THREE.Vector3 | undefined, angularVelocity: THREE.Vector3 | undefined;
+    let maxAcceleration=0,maxAngularAcceleration=0,maxAngularSpeed=0,maxRoll=0;
+    for(let time=0;time<=run.duration;time+=1/hz) {
+      const pose=run.cameraAt(time);
+      expect(pose.every(Number.isFinite)).toBe(true);
+      maxRoll=Math.max(maxRoll,Math.abs(pose[7]));
+      camera.position.fromArray(pose);camera.up.fromArray(cameraUp(pose));camera.lookAt(pose[3],pose[4],pose[5]);
+      if(previousPosition && previousRotation) {
+        const nextVelocity=camera.position.clone().sub(previousPosition).multiplyScalar(hz);
+        const delta=camera.quaternion.clone().multiply(previousRotation.clone().invert());
+        if(delta.w<0)delta.set(-delta.x,-delta.y,-delta.z,-delta.w);
+        const axis=new THREE.Vector3(delta.x,delta.y,delta.z);
+        const nextAngularVelocity=axis.clone().normalize().multiplyScalar(2*Math.atan2(axis.length(),delta.w)*hz);
+        maxAngularSpeed=Math.max(maxAngularSpeed,nextAngularVelocity.length());
+        if(velocity)maxAcceleration=Math.max(maxAcceleration,nextVelocity.clone().sub(velocity).length()*hz);
+        if(angularVelocity)maxAngularAcceleration=Math.max(maxAngularAcceleration,nextAngularVelocity.clone().sub(angularVelocity).length()*hz);
+        velocity=nextVelocity;angularVelocity=nextAngularVelocity;
+      }
+      previousPosition=camera.position.clone();previousRotation=camera.quaternion.clone();
+    }
+    expect(maxRoll,`${route} seed ${seed}: bank`).toBeLessThan(.12);
+    expect(maxAngularSpeed,`${route} seed ${seed}: pan speed`).toBeLessThan(3.2);
+    expect(maxAngularAcceleration,`${route} seed ${seed}: pan acceleration`).toBeLessThan(30);
+    expect(maxAcceleration,`${route} seed ${seed}: dolly acceleration`).toBeLessThan(400);
   }
 });

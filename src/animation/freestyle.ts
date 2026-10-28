@@ -1,6 +1,7 @@
 import { Quaternion, Vector3 } from 'three';
-import { add, BALL_RADIUS, cubicAt, fields, flightPoint, length, mix, mul, PIN_RADIUS, side, sub, TARGET, tubeLength, tubePoint, tubeTangent, unit, type Vec3 } from './mechanism.ts';
-import { ballAt as filmBallAt, cameraAt as filmCameraAt, DURATION, smooth, sourceBall, timing as filmTiming, travel } from './timeline.ts';
+import { add, BALL_RADIUS, cubicAt, fields, flightPoint, length, mul, PIN_RADIUS, side, sub, TARGET, tubeLength, tubePoint, tubeTangent, unit, type Vec3 } from './mechanism.ts';
+import { ballAt as filmBallAt, DURATION, sourceBall, timing as filmTiming, travel } from './timeline.ts';
+import { createFreestyleCamera } from './freestyleCamera.ts';
 import { pathFor, type Scenario } from './scenario.ts';
 
 export type PlaybackMode = 'movie' | 'freestyle';
@@ -157,75 +158,7 @@ export function createFreestyle(seed: number, scenario: Scenario) {
     while (hi-lo > 1) { const mid = (lo+hi) >>> 1; if (spinTimes[mid] < time) lo = mid; else hi = mid; }
     return new Quaternion().slerpQuaternions(rotations[lo],rotations[hi],(time-spinTimes[lo])/(spinTimes[hi]-spinTimes[lo]));
   };
-  // Retain the film's lens, orbit, roll and ball composition. Translate that
-  // rig to the seeded path instead of switching to a wide overhead camera.
-  // A short symmetric filter absorbs the velocity reversals at impacts.
-  // Bake it once so live frames and reverse seeks need no stateful tracking.
-  const cameraHz = 120, filterRadius = 18;
-  const offsets = Array.from({ length: Math.ceil(inletTime * cameraHz) + 1 }, (_, i) => {
-    const time = Math.min(inletTime, i / cameraHz);
-    return sub(ballAt(time), filmBallAt(filmTime(time), path));
-  });
-  const follow = offsets.map((_, i) => {
-    let sum: Vec3 = [0, 0, 0], total = 0;
-    for (let k = -filterRadius; k <= filterRadius; k++) {
-      const weight = 1 + Math.cos(Math.PI * k / (filterRadius + 1));
-      sum = add(sum, mul(offsets[Math.max(0, Math.min(offsets.length - 1, i + k))], weight));
-      total += weight;
-    }
-    return mul(sum, 1 / total);
-  });
-  const followAt = (time: number) => {
-    const i = Math.min(follow.length - 2, Math.max(0, Math.floor(time * cameraHz)));
-    const velocity = (n: number) => mul(sub(follow[Math.min(follow.length - 1,n+1)],follow[Math.max(0,n-1)]),cameraHz/2);
-    return mul(travel(follow[i],follow[i+1],velocity(i),velocity(i+1),i/cameraHz,(i+1)/cameraHz,time),
-      1 - smooth((time - (inletTime - .30)) / .30));
-  };
-  const rawCameraAt = (time: number): number[] => {
-    const visual = filmTime(time), p = ballAt(time);
-    const original = filmCameraAt(visual, path);
-    if (time < inletTime) {
-      const offset = followAt(time);
-      // Leave a little room for the filtered camera to follow a random
-      // rebound while keeping the whole sphere inside the film-style shot.
-      const room = .10 * smooth((time - .65) / .45)
-        * (1 - smooth((time - (inletTime - .60)) / .60));
-      return original.map((value, i) => i < 6
-        ? value + offset[i % 3] + (i < 3 ? (value - original[i + 3]) * room : 0)
-        : value);
-    }
-    if (time < exit) return original;
-    if (time < hit) {
-      const u = smooth((time - exit) / (hit - exit));
-      const endView = filmCameraAt(filmTiming[path].hit, path);
-      const startView = filmCameraAt(filmTiming[path].exit, path);
-      const startBall = ballAt(exit), endBall = ballAt(hit);
-      const offset = mix(sub(startView.slice(0, 3) as unknown as Vec3, startBall), sub(endView.slice(0, 3) as unknown as Vec3, endBall), u);
-      const targetOffset = mix(sub(startView.slice(3, 6) as unknown as Vec3, startBall), sub(endView.slice(3, 6) as unknown as Vec3, endBall), u);
-      return [...add(p, offset), ...add(p, targetOffset), startView[6] + (endView[6] - startView[6]) * u, 0];
-    }
-    return original;
-  };
-  // Different physical phases run at different speeds from the film clock.
-  // Join their camera rigs through short C1 moves, including the outlet roll
-  // and impact view, rather than changing derivatives at a single frame.
-  const joins = [0, fieldStart, fieldEnd, inletTime, exit, hit, duration];
-  const cameraMoves = joins.slice(1, -1).map((time, i) => {
-    const radius = Math.min(.12, (time - joins[i]) / 4, (joins[i + 2] - time) / 4);
-    const from = time - radius, to = time + radius, h = 1e-5;
-    const a = rawCameraAt(from), b = rawCameraAt(to);
-    const derivative = (at: number) => {
-      const before = rawCameraAt(at - h), after = rawCameraAt(at + h);
-      return before.map((value, j) => (after[j] - value) / (2 * h));
-    };
-    return { from, to, a, b, va: derivative(from), vb: derivative(to) };
-  });
-  const cameraAt = (time: number): number[] => {
-    const move = cameraMoves.find(move => time >= move.from && time <= move.to);
-    if (!move) return rawCameraAt(time);
-    return move.a.map((value, i) => travel([value, 0, 0], [move.b[i], 0, 0],
-      [move.va[i], 0, 0], [move.vb[i], 0, 0], move.from, move.to, time)[0]);
-  };
+  const cameraAt = createFreestyleCamera(seed, path, events, ballAt);
   return { seed: seed >>> 0, scenario, duration, events, contacts, ballAt, rotationAt, cameraAt, filmTime, timeAtFilm,
     guidePoint, guideLength: approachLength, launchAttempts: run.attempt + 1, speed };
 }
