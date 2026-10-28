@@ -28,15 +28,16 @@ backward seeking, answer-independent frames and reduced motion. Full-journey
 
 The initial full CI passed 77 of 78 scenarios and exposed an existing first-frame
 clock jump in Movie. A controlled delayed-frame regression reproduces it on the
-baseline; it and both real Movie journeys pass with the correction. Complete
-browser CI for the corrected clock is pending. No application
-deployment, physical-device frame rate or user visual acceptance is claimed.
+baseline; it and both real Movie journeys pass with the correction. The
+[complete 79-scenario CI](https://github.com/Terro216/major-decision/actions/runs/40630479046)
+for application revision `29ce5de` is running. No application deployment,
+physical-device frame rate or user visual acceptance is claimed.
 
 ## Verification — 27 October 2026
 
 The [full browser CI](https://github.com/Terro216/major-decision/actions/runs/40437954869)
-passed all 77 scenarios in 35.7 minutes. Its 68 build inputs match the current
-application and browser tests. Both Docker configuration variants build and pass
+passed all 77 scenarios in 35.7 minutes. Its 68 build inputs match the
+application and browser tests at that revision. Both Docker configuration variants build and pass
 nginx validation. Three analytics scenarios and five CSP configuration cases pass.
 
 The public history was rewritten and checked from a fresh clone. Previous workflow
