@@ -27,9 +27,12 @@ export function useDecision(rate = 1, reducedMotion = false) {
     const chosen = { outcome, scenario, error: null, freestyle, duration, mode: freestyle ? 'freestyle' as const : 'movie' as const };
     if (reduce.current) { commit({ ...chosen, phase: 'result', time: duration, playing: false }); return; }
     commit({ ...chosen, phase: 'running', time: from, playing: true });
-    const tick = (now: number) => {
+    const tick = () => {
       if (run !== generation.current || document.hidden) return;
       // Start after the first scene render, so shader compilation cannot eat the opening shot.
+      // A frame's supplied timestamp can predate that render by seconds. Read
+      // the clock when this callback actually runs, including after resuming.
+      const now = performance.now();
       origin ??= now - current.current.time * 1000 / rate;
       const time = clamp((now - origin) * rate / 1000, 0, duration);
       commit({ ...chosen, phase: time >= duration ? 'result' : 'running', time, playing: time < duration });

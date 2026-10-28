@@ -72,6 +72,44 @@ for (const [outcome, bit] of [['yes', 1], ['no', 0]] as const) {
   });
 }
 
+test('a delayed first frame does not skip the opening in either playback mode', async ({ page }) => {
+  await page.addInitScript(() => {
+    const raf = window.requestAnimationFrame.bind(window);
+    const sample = { delayedAt: 0, first: null as null | { time: number; wall: number } };
+    (window as any).openingClock = sample;
+    window.requestAnimationFrame = callback => raf(timestamp => {
+      const stage = document.querySelector<HTMLElement>('.decision-stage');
+      if (!sample.delayedAt && stage?.dataset.phase === 'running') {
+        // Model shader/driver work earlier in the same frame. Its timestamp
+        // stays old even though the callback is delivered much later.
+        const until = performance.now() + 900;
+        while (performance.now() < until) { /* intentional one-frame delay */ }
+        sample.delayedAt = performance.now();
+      }
+      callback(timestamp);
+    });
+    new MutationObserver(() => {
+      const stage = document.querySelector<HTMLElement>('.decision-stage');
+      const time = Number(stage?.dataset.time);
+      if (sample.delayedAt && !sample.first && time > 0) sample.first = { time, wall: performance.now() };
+    }).observe(document, { subtree: true, attributes: true, attributeFilter: ['data-time'] });
+  });
+  const results = [];
+  for (const mode of ['Movie', 'Freestyle']) {
+    await page.goto('/');
+    await page.getByRole('button', { name: mode, exact: true }).click();
+    await page.getByRole('textbox').fill('Не пропустить начало?');
+    await page.getByRole('button', { name: 'Ask the question' }).click();
+    await page.waitForFunction(() => (window as any).openingClock.first);
+    const sample = await page.evaluate(() => (window as any).openingClock) as { delayedAt: number; first: { time: number; wall: number } };
+    expect(sample.delayedAt).toBeGreaterThan(0);
+    expect(sample.first.time * 1000, mode).toBeLessThanOrEqual(sample.first.wall - sample.delayedAt + 100);
+    results.push({ mode, ...sample });
+  }
+  const artifacts = process.env.MD_REVIEW_DIR || '.review';
+  await writeFile(path.join(artifacts, 'opening-clock-check.json'), JSON.stringify(results, null, 2));
+});
+
 test('reset cancels an active run and a later run draws a fresh single result', async ({ page }) => {
   await fixedRandom(page, 0);
   await page.clock.install();
