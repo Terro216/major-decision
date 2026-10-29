@@ -95,7 +95,6 @@ button:focus-visible{outline:4px solid #e9e7ab;outline-offset:5px}
 .mobile-ornaments{display:none}
 .indicator{container-type:inline-size}
 .indicator-ball{width:30.989583%;height:auto;aspect-ratio:1;font-size:12.5cqw}
-.playback-controls{display:flex;gap:8px}
 select:focus-visible{outline:3px solid #e9e7ab;outline-offset:3px}
 .sound-error{font-size:12px;color:#ffb4a3}
 ::selection{background:#b9dcef;color:#08142b}

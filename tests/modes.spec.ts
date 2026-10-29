@@ -92,7 +92,7 @@ test('mode changes cancel playback and preserve the question; a new freestyle ru
   await page.getByRole('button', { name: 'Ask the question' }).click();
   await expect(page.locator('.decision-stage')).toHaveAttribute('data-seed', '61');
   expect(await page.evaluate(() => (window as any).modeDraws)).toEqual({ route: 2, seed: 2, answer: 2 });
-  await page.getByRole('button', { name: 'SHOW ANSWER', exact: true }).click();
+  await page.clock.runFor(32); await page.clock.fastForward(20_000);
   await expect(page.getByRole('status')).toHaveText('YES');
 });
 

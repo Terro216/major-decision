@@ -67,9 +67,9 @@ test('sound pauses in the background, cancels scheduled notes on reset and reuse
   await page.getByRole('textbox').fill('Again?');
   await page.getByRole('button',{name:'Ask the question'}).click();
   await expect.poll(()=>page.evaluate(()=>(window as any).voices.length)).toBeGreaterThan(voices.length);
-  await page.getByRole('button',{name:'PAUSE',exact:true}).click();
-  const pause = await page.evaluate(()=>({now:(window as any).audioContexts[0].currentTime,voices:(window as any).voices}));
-  expect(pause.voices.every((voice:any)=>voice.stops.at(-1)<=pause.now+.03)).toBe(true);
+  await page.getByRole('button',{name:'NEW QUESTION'}).click();
+  const reset = await page.evaluate(()=>({now:(window as any).audioContexts[0].currentTime,voices:(window as any).voices}));
+  expect(reset.voices.every((voice:any)=>voice.stops.at(-1)<=reset.now+.03)).toBe(true);
   expect(await page.evaluate(()=>(window as any).audioContexts.length)).toBe(1);
 });
 

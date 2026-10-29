@@ -64,11 +64,22 @@ try {
       for(const name of ['HOROSCOPE','ROMANCE','CAREER']) assert(await page.getByRole('button',{name}).isDisabled());
       const input=page.getByRole('textbox',{name:'Your question'});
       await input.fill('Проверочный вопрос — останется ли он в этой вкладке?');
+      await page.evaluate(()=>{
+        const check={runningObserved:false,unwantedControls:false};
+        window.smokePlayback=check;
+        new MutationObserver(()=>{
+          if(document.querySelector('.decision-stage')?.dataset.phase!=='running')return;
+          check.runningObserved=true;
+          check.unwantedControls ||= [...document.querySelectorAll('button')].some(button=>/^(PAUSE|RESUME|SHOW ANSWER)$/.test(button.textContent.trim()));
+        }).observe(document.body,{subtree:true,childList:true,attributes:true,attributeFilter:['data-phase']});
+      });
       await page.getByRole('button',{name:'Ask the question'}).click();
       await page.waitForFunction(()=>document.querySelector('.decision-stage').dataset.phase==='result',{}, {timeout:25_000});
       assert.equal(await page.getByRole('status').innerText(),outcome.toUpperCase());
       const stage=await page.locator('.decision-stage').evaluate(element=>({...element.dataset}));
       assert.equal(stage.scenario,scenario);assert.equal(stage.renderer,'webgl');assert.equal(stage.mode,mode);
+      const playback=await page.evaluate(()=>window.smokePlayback);
+      assert.deepEqual(playback,{runningObserved:true,unwantedControls:false});
       await page.locator('canvas').evaluate(canvas=>canvas.getContext('webgl2').finish());
       assert.deepEqual(await page.evaluate(()=>window.smokeDraws),{route:1,seed:mode==='freestyle'?1:0,answer:1});
       assert.equal(await page.evaluate(()=>localStorage.length+sessionStorage.length),0);
@@ -84,7 +95,7 @@ try {
       assert.equal(await page.locator('canvas').count(),0);
       await Promise.all(collected);
       assert.deepEqual(errors,[]);
-      runs.push({mode,scenario,outcome,width,height,renderer:stage.renderer,requests:requests.length,questionInStorage:false,errors});
+      runs.push({mode,scenario,outcome,width,height,renderer:stage.renderer,playback,requests:requests.length,questionInStorage:false,errors});
     } finally {await context.close();}
   }
 } finally {await browser.close();}

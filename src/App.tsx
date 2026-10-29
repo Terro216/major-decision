@@ -127,10 +127,6 @@ export function App() {
       <button className="frame-toggle" type="button" aria-pressed={cinema} onClick={() => setCinema(!cinema)}>BROWSER FRAME <span>{cinema ? 'ON' : 'OFF'}</span></button>
       <button className="frame-toggle" type="button" aria-pressed={sound.enabled} onClick={() => void sound.toggle()}>SOUND <span>{sound.enabled ? 'ON' : 'OFF'}</span></button>
       {sound.error && <span className="sound-error" role="alert">{sound.error}</span>}
-      {phase === 'running' && !review && <div className="playback-controls" aria-label="Animation controls">
-        <button type="button" className="frame-toggle" onClick={() => playing ? decision.pause() : decision.play(outcome)}>{playing ? 'PAUSE' : 'RESUME'}</button>
-        <button type="button" className="frame-toggle" onClick={decision.finish}>SHOW ANSWER</button>
-      </div>}
       <div className="random-controls">
         <label>RANDOM <select aria-label="Random source" value={randomMode} disabled={busy} onChange={event => { setRandomMode(event.target.value as RandomMode); decision.reset(); }}><option value="local">LOCAL</option><option value="external">RANDOM.ORG</option></select></label>
         {randomMode === 'external' && <small>Your question stays in this tab.</small>}

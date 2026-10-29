@@ -79,7 +79,7 @@ test('reduced motion chooses once and renders the same readable answer without a
   await expect(page.locator('canvas')).toHaveCount(0);
 });
 
-test('live motion preference, pause, resume and skip retain the selected route and answer', async ({ page }) => {
+test('ordinary playback has no pause or skip controls and respects live motion preference', async ({ page }) => {
   await page.clock.install();
   await page.goto('/');
   await page.getByRole('textbox').fill('Продолжить?');
@@ -87,13 +87,8 @@ test('live motion preference, pause, resume and skip retain the selected route a
   await page.clock.runFor(32); await page.clock.fastForward(700);
   const stage = page.locator('.decision-stage');
   const pair = await stage.evaluate(el => [el.getAttribute('data-outcome'),el.getAttribute('data-scenario')]);
-  await page.getByRole('button',{name:'PAUSE',exact:true}).click();
-  const paused = await stage.getAttribute('data-time');
-  await page.clock.fastForward(20_000);
-  await expect(stage).toHaveAttribute('data-time',paused!);
-  await page.getByRole('button',{name:'RESUME',exact:true}).click();
-  await page.clock.runFor(32); await page.clock.fastForward(250);
-  expect(Number(await stage.getAttribute('data-time'))).toBeGreaterThan(Number(paused));
+  await expect(stage).toHaveAttribute('data-phase','running');
+  await expect(page.getByRole('button',{name:/^(PAUSE|RESUME|SHOW ANSWER)$/})).toHaveCount(0);
   await page.emulateMedia({reducedMotion:'reduce'});
   await expect(page.getByRole('status')).toHaveText(pair[0]!.toUpperCase());
   await expect(stage).toHaveAttribute('data-scenario',pair[1]!);
@@ -103,7 +98,7 @@ test('live motion preference, pause, resume and skip retain the selected route a
   await page.getByRole('textbox').fill('Ещё раз?');
   await page.getByRole('button',{name:'Ask the question'}).click();
   const answer = await stage.getAttribute('data-outcome');
-  await page.getByRole('button',{name:'SHOW ANSWER',exact:true}).click();
+  await page.clock.runFor(32); await page.clock.fastForward(8000);
   await expect(page.getByRole('status')).toHaveText(answer!.toUpperCase());
 });
 

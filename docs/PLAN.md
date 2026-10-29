@@ -3,7 +3,7 @@
 Recreate the film's decision machine while keeping it usable on desktop and mobile.
 
 Implemented: SVG/CSS shell, live Movie and Freestyle scenes, independent answer
-selection, Cyrillic input, optional sound, pause/skip, reduced motion, keyboard
+selection, Cyrillic input, optional sound, automatic playback, reset, reduced motion, keyboard
 accessibility and a fallback when WebGL is unavailable.
 
 Future visual changes should start from film evidence and preserve a before/after

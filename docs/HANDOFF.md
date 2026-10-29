@@ -16,6 +16,14 @@ Public documentation contains product and portable development information.
 Deployment-specific configuration and historical working notes are kept outside Git.
 Analytics is optional and configured at build time; a fresh clone sends no analytics.
 
+## Playback controls — 29 October 2026
+
+Ordinary playback runs to its answer without PAUSE or SHOW ANSWER buttons.
+NEW QUESTION cancels a run; reduced motion and background-tab handling remain
+available. Diagnostic review controls are retained for deterministic comparisons.
+The build and all three affected interaction tests pass. Candidate-image and
+public-release verification are pending.
+
 ## Camera verification — 28 October 2026
 
 The TypeScript/Vite build and eight camera/trajectory regression tests pass.
@@ -30,8 +38,8 @@ The initial full CI passed 77 of 78 scenarios and exposed an existing first-fram
 clock jump in Movie. A controlled delayed-frame regression reproduces it on the
 baseline; it and both real Movie journeys pass with the correction. The
 [complete 79-scenario CI](https://github.com/Terro216/major-decision/actions/runs/40630479046)
-for application revision `29ce5de` is running. No application deployment,
-physical-device frame rate or user visual acceptance is claimed.
+passed for application revision `29ce5de`. This camera verification did not
+include a deployment, physical-device frame rate or user visual acceptance.
 
 ## Verification — 27 October 2026
 
