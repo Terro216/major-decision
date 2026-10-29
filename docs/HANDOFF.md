@@ -21,8 +21,13 @@ Analytics is optional and configured at build time; a fresh clone sends no analy
 Ordinary playback runs to its answer without PAUSE or SHOW ANSWER buttons.
 NEW QUESTION cancels a run; reduced motion and background-tab handling remain
 available. Diagnostic review controls are retained for deterministic comparisons.
-The build and all three affected interaction tests pass. Candidate-image and
-public-release verification are pending.
+Application revision `97dcbb4` is released. The build and all three affected
+interaction tests pass. Candidate and public HTTPS browser checks each passed
+all eight mode/route/answer combinations, including the absence of the removed
+controls throughout playback, Cyrillic input, WebGL, sound and reset. Desktop
+and mobile playing-state screenshots were reviewed; shipped assets match the
+tested build. The [full CI](https://github.com/Terro216/major-decision/actions/runs/40931650127)
+for this revision is still running.
 
 ## Camera verification — 28 October 2026
 
