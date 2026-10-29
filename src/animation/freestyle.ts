@@ -1,12 +1,14 @@
-import { Quaternion, Vector3 } from 'three';
-import { add, BALL_RADIUS, cubicAt, fields, flightPoint, length, mul, PIN_RADIUS, side, sub, TARGET, tubeLength, tubePoint, tubeTangent, unit, type Vec3 } from './mechanism.ts';
+import { add, BALL_RADIUS, cubicAt, fields, flightPoint, length, mul, PIN_RADIUS, side, sub, TARGET, tubePoint, tubeTangent, unit, type Vec3 } from './mechanism.ts';
 import { ballAt as filmBallAt, DURATION, sourceBall, timing as filmTiming, travel } from './timeline.ts';
+import { buildTubeMotion } from './tubeMotion.ts';
+import { ballSpin } from './ballSpin.ts';
 import { createFreestyleCamera } from './freestyleCamera.ts';
 import { pathFor, type Scenario } from './scenario.ts';
 
 export type PlaybackMode = 'movie' | 'freestyle';
 type Leg = { from: number; to: number; start: Vec3; end: Vec3; velocity: Vec3 };
 export type Contact = { time: number; index: number; point: Vec3; incoming: Vec3; outgoing: Vec3; normal: Vec3; color: 'yes' | 'no' };
+type Launch = { entry: Vec3; velocity: Vec3; legs: Leg[]; contacts: Contact[]; end: Vec3; endVelocity: Vec3; elapsed: number; attempt: number };
 const radius = BALL_RADIUS + PIN_RADIUS;
 
 function randomFrom(seed: number) {
@@ -22,14 +24,16 @@ function randomFrom(seed: number) {
 // Event-driven sphere/cylinder collisions. Motion between impacts is linear;
 // each impact reflects the incoming velocity about the actual contact normal.
 // A seed selects a successful launch, never a new random direction mid-flight.
-function launch(seed: number) {
+function launch(seed: number): Launch {
   const random = randomFrom(seed);
-  for (let attempt = 0; attempt < 512; attempt++) {
-    const entry: Vec3 = [-1.5 + (random() - .5) * 1.6, BALL_RADIUS, -8.95];
-    const velocity: Vec3 = [(random() - .5) * 6, 0, 9 + random() * 3];
+  for (let attempt = 0; attempt < 16384; attempt++) {
+    // Aim along the two first-row corridors. Broad sideways launches mostly
+    // skimmed the outside of the diamond or bounced back toward the source.
+    const entry: Vec3 = [-1.5 + (random() > .5 ? 1 : -1) * (.70 + random() * .32), BALL_RADIUS, -8.95];
+    const velocity: Vec3 = [(random() - .5) * 1.8, 0, 10 + random() * 3];
     let p = entry, v = velocity, elapsed = 0;
     const legs: Leg[] = [], contacts: Contact[] = [];
-    for (let bounce = 0; bounce < 100 && elapsed < 7; bounce++) {
+    for (let bounce = 0; bounce < 100 && elapsed < 5.5; bounce++) {
       let next = Infinity, index = -1;
       for (let i = 0; i < fields.yes.pins.length; i++) {
         const pin = fields.yes.pins[i].position;
@@ -42,22 +46,23 @@ function launch(seed: number) {
         if (hit > 1e-7 && hit < next) { next = hit; index = i; }
       }
       const exit = v[2] > 0 ? (6.5 - p[2]) / v[2] : Infinity;
-      const sideExit = v[0] > 0 ? (7.5 - p[0]) / v[0] : v[0] < 0 ? (-10.5 - p[0]) / v[0] : Infinity;
+      const sideExit = v[0] > 0 ? (3.4 - p[0]) / v[0] : v[0] < 0 ? (-8.7 - p[0]) / v[0] : Infinity;
       const backExit = v[2] < 0 ? (-9.5 - p[2]) / v[2] : Infinity;
       const dt = Math.min(next, exit, sideExit, backExit);
-      if (!Number.isFinite(dt) || elapsed + dt > 7) break;
+      if (!Number.isFinite(dt) || elapsed + dt > 5.5) break;
       const end = add(p, mul(v, dt));
       legs.push({ from: elapsed, to: elapsed + dt, start: p, end, velocity: v });
       elapsed += dt;
       if (dt === exit) {
-        if (contacts.length >= 4 && contacts.length <= 32) return { entry, velocity, legs, contacts, end, endVelocity: v, elapsed, attempt };
+        const varied = contacts.length >= 9 && contacts.length <= 24 && new Set(contacts.map(c => c.index)).size >= 7;
+        const directed = end[0] > -5.5 && v[0] > length(velocity) * .1;
+        if (varied && directed && legs.every(leg => leg.to - leg.from < 1))
+          return { entry, velocity, legs, contacts, end, endVelocity: v, elapsed, attempt };
         break;
       }
-      if (dt === sideExit || dt === backExit) {
-        p = end;
-        v = dt === sideExit ? [-v[0], 0, v[2]] : [v[0], 0, -v[2]];
-        continue;
-      }
+      // These are rejection limits, not invisible reflecting walls. The
+      // right limit also keeps the full sphere away from the coil's exterior.
+      if (dt === sideExit || dt === backExit) break;
       const pin = fields.yes.pins[index].position;
       const normal = unit([end[0] - pin[0], 0, end[2] - pin[2]]);
       const projection = v[0] * normal[0] + v[2] * normal[2];
@@ -66,6 +71,9 @@ function launch(seed: number) {
       p = end; v = outgoing;
     }
   }
+  // A bounded search must never prevent an answer. Re-simulate the known
+  // valid reserve launch if a seed exhausts the budget; no answer is redrawn.
+  if (seed !== 0) { const reserve = launch(0); return { ...reserve, attempt: 16384 + reserve.attempt }; }
   throw new Error('No complete freestyle launch found.');
 }
 
@@ -99,7 +107,8 @@ export function createFreestyle(seed: number, scenario: Scenario) {
   const guide = arc(u => cubicAt(curve, u));
   const approachLength = guide.length + 2;
   const inletTime = fieldEnd + approachLength / speed;
-  const coilDuration = 1.65, exit = inletTime + coilDuration, exitSpeed = 24;
+  const coilDuration = 1.20, exit = inletTime + coilDuration, exitSpeed = 40;
+  const coil = buildTubeMotion(path, inletTime, exit, speed, exitSpeed);
   const flight = arc(u => flightPoint(u * TARGET.flight, path));
   const hit = exit + flight.length / exitSpeed;
   const duration = hit + (DURATION - filmTiming[path].hit);
@@ -131,36 +140,17 @@ export function createFreestyle(seed: number, scenario: Scenario) {
     if (time < exit) {
       // A powered coil accelerates continuously, with matching endpoint
       // velocities; there are no measured-frame holds in live motion.
-      const distance = travel([0, 0, 0], [tubeLength, 0, 0], [speed, 0, 0], [exitSpeed, 0, 0], inletTime, exit, time)[0];
+      const distance = coil.distanceAt(time);
       return tubePoint(distance, path);
     }
     if (time < hit) return flight.at((time - exit) * exitSpeed);
     return filmBallAt(filmTime(time), path);
   };
-  // Integrate rolling orientation along the actual path once, including exact
-  // impact times. Reversing a seek restores the same rotation; impacts change
-  // the angular velocity without snapping the texture to a new orientation.
-  const spinTimes = [...new Set([fieldStart, inletTime, ...run.legs.map(leg => fieldStart + leg.to),
-    ...Array.from({ length: Math.ceil((inletTime - fieldStart) * 120) }, (_, i) => fieldStart + i / 120)])].sort((a,b) => a-b);
-  const rotations = [new Quaternion()];
-  let previousPoint = ballAt(fieldStart);
-  for (const time of spinTimes.slice(1)) {
-    const point = ballAt(time), delta = sub(point, previousPoint);
-    const normal = new Vector3(delta[2], 0, -delta[0]).normalize();
-    rotations.push(rotations.at(-1)!.clone().premultiply(new Quaternion().setFromAxisAngle(normal, length(delta) / BALL_RADIUS)).normalize());
-    previousPoint = point;
-  }
-  const rotationAt = (time: number) => {
-    if (time <= fieldStart) return new Quaternion();
-    if (time >= inletTime) return rotations.at(-1)!.clone().premultiply(new Quaternion().setFromAxisAngle(
-      new Vector3(axis[2],0,-axis[0]).normalize(), (Math.min(time,hit)-inletTime)*speed/BALL_RADIUS));
-    let lo = 0, hi = spinTimes.length - 1;
-    while (hi-lo > 1) { const mid = (lo+hi) >>> 1; if (spinTimes[mid] < time) lo = mid; else hi = mid; }
-    return new Quaternion().slerpQuaternions(rotations[lo],rotations[hi],(time-spinTimes[lo])/(spinTimes[hi]-spinTimes[lo]));
-  };
+  const rotationAt = ballSpin(entryVelocity, release, fieldStart, hit);
   const cameraAt = createFreestyleCamera(seed, path, events, ballAt);
   return { seed: seed >>> 0, scenario, duration, events, contacts, ballAt, rotationAt, cameraAt, filmTime, timeAtFilm,
-    guidePoint, guideLength: approachLength, launchAttempts: run.attempt + 1, speed };
+    guidePoint, guideLength: approachLength, launchAttempts: run.attempt + 1, speed, coil,
+    legs: run.legs.map(leg => ({ ...leg, start: mirror(leg.start), end: mirror(leg.end), velocity: mirror(leg.velocity), from: leg.from + fieldStart, to: leg.to + fieldStart })) };
 }
 
 export type FreestyleRun = ReturnType<typeof createFreestyle>;

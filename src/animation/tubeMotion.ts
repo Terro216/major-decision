@@ -1,6 +1,5 @@
 import { tubeLength, type Outcome } from './mechanism.ts';
 import { bernsteinAt, bernsteinUpperBound } from './motionCurve.ts';
-import { exposureKeys } from './exposureKeys.ts';
 
 // Original 30 fps frames hold these poses. Fractions are reconstructed on the
 // fixed tube from cameras fitted to its mouths, silhouette and distant source.
@@ -17,19 +16,17 @@ export const tubePoses: Record<Outcome, readonly (readonly [number, number])[]> 
     [143/30,.93281], [145/30,.93281]],
 };
 
-export function buildTubeMotion(route: Outcome, start: number, end: number, entrySpeed: number, exitSpeed: number) {
-  const keys = [[start, 0], ...exposureKeys(tubePoses[route]).map(([time, fraction]) => [time, fraction * tubeLength]), [end, tubeLength]];
+export function buildTubeMotion(_route: Outcome, start: number, end: number, entrySpeed: number, exitSpeed: number) {
+  // One powered sweep through both turns. The film's duplicated exposures
+  // constrain the route and overall timing, not a series of speed pulses.
+  const keys = [[start, 0], [end, tubeLength]];
   const slopes = keys.slice(1).map(([time, distance], i) => (distance - keys[i][1]) / (time - keys[i][0]));
   const speeds = keys.map((_, i) => i === 0 ? entrySpeed : i === keys.length - 1 ? exitSpeed : Math.min(slopes[i - 1], slopes[i]));
-  // Endpoint velocities are inherited from the adjoining paths. Limit the
-  // adjacent interior speed so every derivative control remains nonnegative.
-  speeds[1] = Math.min(speeds[1], Math.max(0, 2.5 * slopes[0] - entrySpeed));
-  speeds[speeds.length - 2] = Math.min(speeds.at(-2)!, Math.max(0, 2.5 * slopes.at(-1)! - exitSpeed));
+  // Endpoint velocities are inherited from the adjoining paths.
   const segments = slopes.map((_, i) => {
     const [from, a] = keys[i], [to, b] = keys[i + 1], dt = to - from;
     // Quintic Hermite in Bernstein form: specified velocity, zero acceleration
-    // at every end. Exposure groups above have one key each, so the live ball
-    // keeps moving between the photographed poses.
+    // at both ends, with no intermediate braking or held exposures.
     const controls = [a, a + dt * speeds[i] / 5, a + 2 * dt * speeds[i] / 5,
       b - 2 * dt * speeds[i + 1] / 5, b - dt * speeds[i + 1] / 5, b];
     const velocity = controls.slice(1).map((value, j) => 5 * (value - controls[j]) / dt);

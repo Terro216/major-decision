@@ -6,8 +6,10 @@ import { releasePath } from './releasePath.ts';
 import { flightMotion } from './flightMotion.ts';
 import { buildTubeMotion } from './tubeMotion.ts';
 import { exitViews } from './exitViews.ts';
-import { bernsteinAt } from './motionCurve.ts';
+import { bernsteinAt, bernsteinSplit, bernsteinUpperBound } from './motionCurve.ts';
 import { exposureKeys } from './exposureKeys.ts';
+import { smoothCamera } from './cameraSmoothing.ts';
+import { ballSpin } from './ballSpin.ts';
 export { helixPoint, type Outcome, type Vec3 } from './mechanism.ts';
 export type Phase = 'idle' | 'preparing' | 'running' | 'result';
 export type Key = readonly [number, ...number[]];
@@ -18,26 +20,12 @@ export const reached = (time: number, event: number) => time + 1e-9 >= event;
 export const clamp = (n: number, min = 0, max = 1) => Math.min(max, Math.max(min, n));
 export const smooth = (n: number) => { const v = clamp(n); return v * v * (3 - 2 * v); };
 
-// Complete source rays establish held poses as well as the accelerating turn.
-// Ignore mixed CRT scanout frames; interpolate the whole observed poses in C2.
-const sourceTurns: Record<Outcome, readonly Key[]> = {
-  yes: [[0,0],[1/30,.05],[2/30,.05],[3/30,.15],[5/30,.15],[6/30,.30],
-    [7/30,.40],[8/30,.50],[9/30,.75],[11/30,.75],[12/30,1.00],
-    [14/30,1.25],[15/30,1.50],[16/30,1.50]],
-  no: [[0,0],[2/30,0],[3/30,.05],[4/30,.05],[5/30,.15],[7/30,.15],
-    [8/30,.30],[9/30,.50],[10/30,.50],[11/30,.75],[13/30,.75],
-    [14/30,1.00],[15/30,1.25],[16/30,1.25],[17/30,1.50]],
-};
+// The star gains speed continuously. Repeated source exposures are camera
+// samples, not mechanical stops in a motor's rotation.
 export function sourceAngleAt(time: number, path: Outcome) {
   const elapsed = Math.max(0, time - (path === 'no' ? 2/30 : 0));
-  const ramp = Math.min(elapsed,.35), tail = Math.max(0,elapsed-.35);
-  const continuous=6.6*ramp*ramp+.4*ramp+5.02*tail;
-  const keys=sourceTurns[path],last=keys.at(-1)!,end=last[0]+.25;
-  if(time<=last[0]) return -side(path)*framingAt(keys,time,true)[0];
-  if(time>=end) return -side(path)*continuous;
-  // Rejoin the existing later rotation without changing its reflected poses.
-  const final=.9485+5.02*(end-(path==='no'?2/30:0)-.35),dt=end-last[0];
-  return -side(path)*bernsteinAt([last[1],last[1],last[1],final-2*dt*5.02/5,final-dt*5.02/5,final],(time-last[0])/dt);
+  const duration = .48, u = Math.min(1, elapsed / duration), rate = 5.4;
+  return -side(path) * rate * (duration * (u ** 3 - u ** 4 / 2) + Math.max(0, elapsed - duration));
 }
 
 export function track(keys: readonly Key[], time: number): number[] {
@@ -77,22 +65,11 @@ const contactBeats: Record<Outcome, readonly number[]> = {
   yes: [...earlyContactTimes,75/30,77/30,79/30,82/30,84/30,85/30,87/30,2.98,3.055,95/30,98/30,3.28,102/30,103/30,3.58],
   no: [...earlyContactTimes.map(time=>time+2/30),76/30,78/30,81/30,83/30,85/30,86/30,3.05,3.08,3.155,98/30,100/30,3.35,3.45,3.545,3.65],
 };
-// Consecutive film frames hold several late poses. The fractions locate those
-// poses on the independently collision-tested path, with a fixed camera fit.
-// Equal-distance knots create a C1 pause, not a discontinuous frame quantizer.
-const fieldPoseKnots: Record<Outcome, readonly (readonly [number, number, number])[]> = {
-  yes: [[3,22,.306],[91/30,22,.306],[92/30,23,.122],[3.1,23,.122],
-    [3.2,24,.744],[97/30,24,.744],[3.3,26,.704],[101/30,26,.704],
-    [3.5,28,.696],[3.55,28,.696],[3.6,29,.104],[3.8,29,0.630982491711]],
-  no: [[89/30,20,.656],[91/30,20,.656],[3.1,22,.306],[94/30,22,.306],[95/30,23,.122],[3.2,23,.122],
-    [3.3,24,.744],[3.316666666667,24,.744],[3.4,26,.704],[103/30,26,.704],[104/30,27,.466],[106/30,27,.466],
-    [107/30,28,.696],[109/30,28,.696],[110/30,29,.104],[3.8,29,0.593369651126]],
-};
+// The authored collision sequence keeps its film rhythm. Do not add the
+// held intermediate poses from the recording as extra stops between strikes.
 function fieldTrack(outcome: Outcome) {
   const t=timing[outcome], pathDistances=fields[outcome].distances;
   const knots=[t.fieldStart,...contactBeats[outcome],t.fieldEnd].map((time,i)=>({time,distance:pathDistances[i]}));
-  for(const [time,segment,fraction] of fieldPoseKnots[outcome]) knots.push({time,
-    distance:pathDistances[segment]+fraction*(pathDistances[segment+1]-pathDistances[segment])});
   knots.sort((a,b)=>a.time-b.time);
   const times=knots.map(k=>k.time),distances=knots.map(k=>k.distance);
   const slopes=times.slice(1).map((time,i)=>(distances[i+1]-distances[i])/(time-times[i]));
@@ -117,17 +94,23 @@ export function fieldVelocityBound(outcome: Outcome) {
   const {times,distances,velocities}=fieldTracks[outcome];
   const field=fields[outcome];
   return Math.max(fieldEntries[outcome].speedBound,...times.slice(1).map((t,i)=>{
-    const distance=distances[i+1]-distances[i];
     // Every contact is a time knot. Each interval therefore lies within one
     // spatial segment; a free curve's factor must not multiply earlier legs.
     const middle=(distances[i]+distances[i+1])/2;
     const end=field.distances.findIndex(d=>d>middle),curve=field.curves.get(end);
     const span=field.distances[end]-field.distances[end-1];
-    const curveFactor=curve?cubicSpeedBound(curve,
-      (distances[i]-field.distances[end-1])/span,
-      (distances[i+1]-field.distances[end-1])/span)/span:1;
-    const parameterSpeed=Math.max(velocities[i],velocities[i+1],3*distance/(t-times[i])-velocities[i]-velocities[i+1]);
-    return parameterSpeed*curveFactor;
+    const dt=t-times[i],start=distances[i],endDistance=distances[i+1];
+    const controls=[start,start+dt*velocities[i]/3,endDistance-dt*velocities[i+1]/3,endDistance];
+    const velocity=controls.slice(1).map((value,j)=>3*(value-controls[j])/dt);
+    const bound=(p:number[],v:number[],depth=6):number=>{
+      if(!curve)return bernsteinUpperBound(v);
+      if(!depth)return Math.max(...v)*cubicSpeedBound(curve,
+        (Math.min(...p)-field.distances[end-1])/span,
+        (Math.max(...p)-field.distances[end-1])/span)/span;
+      const ps=bernsteinSplit(p),vs=bernsteinSplit(v);
+      return Math.max(bound(ps[0],vs[0],depth-1),bound(ps[1],vs[1],depth-1));
+    };
+    return bound(controls,velocity);
   }));
 }
 export function exitSpeed(_outcome: Outcome) { return 100; }
@@ -153,15 +136,9 @@ export const pinContacts = Object.fromEntries((['yes', 'no'] as const).map(outco
   })];
 })) as Record<Outcome, [number, number, Outcome][]>;
 
-// The filmed NO route already shows these colours while its ball pose is
-// held. Preserve the observed display frames separately from the continuous
-// collision timeline; all contacts still use the full sphere and actual pins.
-const noColorFrames = new Map([[20,89],[21,92],[26,104],[27,105]]);
-export const pinColorEvents = Object.fromEntries((['yes','no'] as const).map(outcome=>[
-  outcome,pinContacts[outcome].map(([time,index,color],contact)=>[
-    outcome==='no' && noColorFrames.has(contact) ? noColorFrames.get(contact)!/30 : time,index,color,
-  ]),
-])) as Record<Outcome, [number, number, Outcome][]>;
+// A pin changes at its physical strike, including the formerly held late
+// exposures. Lighting and sound now share the same collision timeline.
+export const pinColorEvents = pinContacts;
 
 export function ballAt(time: number, outcome: Outcome): Vec3 {
   const t = timing[outcome], f = fields[outcome], speed = fieldSpeed(outcome);
@@ -353,61 +330,28 @@ export function revealRise(time: number, outcome: Outcome) {
     + .50*smooth((time-6.03)/(188/30-6.03));
 }
 
-function targetRevealAngle(time: number, outcome: Outcome) {
-  const origin=timing[outcome].color+1/60;
-  if(outcome==='no') {
-    if(time<=timing.no.hit) return 2.3*(time-origin);
-    if(time<timing.no.color) return travel([2.3*(timing.no.hit-origin),0,0],[-.17,0,0],[2.3,0,0],[0,0,0],timing.no.hit,timing.no.color,time)[0];
-    // Full visible triangular rays, rather than the clipped disc centre,
-    // constrain the continued, accelerating NO turn and its held source poses.
-    return track([[176/30,-.17],[177/30,-.17],[178/30,0],[179/30,0],[180/30,.20],[181/30,.20],[182/30,.40],[183/30,.40],[184/30,.575],[185/30,.575],[186/30,.815],[187/30,.815],[188/30,1.10],[189/30,1.10],[190/30,1.40],[191/30,1.40],[192/30,1.74],[193/30,1.74],[194/30,2.08],[195/30,2.08]],time)[0];
+// A single motor turn approaches the target. YES eases to its final pose;
+// the mirrored route continues to accelerate as the result rises.
+export function targetAngleAt(time: number, outcome: Outcome) {
+  const t = timing[outcome], rate = 2.3;
+  if (outcome === 'no') {
+    const duration = .8, elapsed = Math.max(0, time - t.hit), u = Math.min(1, elapsed / duration);
+    return -.17 + Math.PI / 4 + rate * (time - t.color)
+      + 3 * (duration * (u ** 3 - u ** 4 / 2) + Math.max(0, elapsed - duration));
   }
-  // Whole front-cap triangles retain the YES176–178 pose, then settle at181.
-  // C2 spans preserve that source hold at arbitrary refresh rates and seeks.
-  if(time>=timing.yes.color) return framingAt(
-    [[175/30,.098],[176/30,-.0777],[178/30,-.0777],[179/30,-.2434],[181/30,-.28]],time,true)[0];
-  // The older continuous turn still defines the distant pre-impact phase.
-  const stop=181/30, final=-.28, start=2*(origin-final/2.3)-stop;
-  if(time<=start) return -2.3*(time-origin);
-  if(time>=stop) return final;
-  return travel([-2.3*(start-origin),0,0],[final,0,0],[-2.3,0,0],[0,0,0],start,stop,time)[0];
+  const stop = t.color + .20, start = t.hit - .28, duration = stop - start;
+  const final = -.28 - Math.PI / 4, u = clamp((time - start) / duration);
+  if (time <= start) return final + rate * (duration / 2 + start - time);
+  return final + rate * duration * (.5 - u + u ** 3 - u ** 4 / 2);
 }
 
-// Full visible ray triangles establish these orientations and holds. The star
-// repeats every pi/4, so absolute revolution count is not recoverable. Unwrap
-// in the observed direction and join the measured reveal without a phase cut.
-const targetTurns: Record<Outcome, readonly Key[]> = {
-  yes: [[160/30,targetRevealAngle(160/30,'yes')],
-    [163/30,.684251338422],[166/30,.684251338422],
-    [167/30,.559704194136],[169/30,.559704194136],
-    [170/30,-0.019314667315],[171/30,-0.289946584493],[173/30,-0.289946584493],
-    [timing.yes.color,targetRevealAngle(timing.yes.color,'yes')-Math.PI/4]],
-  no: [[162/30,targetRevealAngle(162/30,'no')],
-    [165/30,-.647651931127],[166/30,-.647651931127],[167/30,-.580792122117],
-    [168/30,-0.362061301958],[170/30,-0.362061301958],
-    [171/30,-0.070342335923],[172/30,0.223475019692],[173/30,0.223475019692],
-    [174/30,.40],[175/30,.40],
-    [timing.no.color,targetRevealAngle(timing.no.color,'no')+Math.PI/4]],
+export const ballRotation = {
+  yes: ballSpin([0, 0, 11], timing.yes.release, timing.yes.fieldStart, timing.yes.hit),
+  no: ballSpin([0, 0, 11], timing.no.release, timing.no.fieldStart, timing.no.hit),
 };
-export function targetAngleAt(time: number, outcome: Outcome) {
-  const keys=targetTurns[outcome], offset=-side(outcome)*Math.PI/4;
-  if(time<=keys[0][0]) return targetRevealAngle(time,outcome);
-  if(time>=keys.at(-1)![0]) return targetRevealAngle(time,outcome)+offset;
-  const i=keys.findIndex(k=>k[0]>=time),a=keys[i-1],b=keys[i],dt=b[0]-a[0];
-  const velocity=(n:number)=>{
-    if(n===0) return -side(outcome)*2.3;
-    if(n===keys.length-1) return 0;
-    const before=(keys[n][1]-keys[n-1][1])/(keys[n][0]-keys[n-1][0]);
-    const after=(keys[n+1][1]-keys[n][1])/(keys[n+1][0]-keys[n][0]);
-    return before*after<=0?0:Math.sign(before)*Math.min(Math.abs(before),Math.abs(after));
-  };
-  const va=velocity(i-1),vb=velocity(i);
-  return bernsteinAt([a[1],a[1]+dt*va/5,a[1]+2*dt*va/5,
-    b[1]-2*dt*vb/5,b[1]-dt*vb/5,b[1]],(time-a[0])/dt);
-}
 
 // Continue around the flying ball to the actual target. No camera/world cut.
-export function cameraAt(time: number, outcome: Outcome) {
+function observedCameraAt(time: number, outcome: Outcome) {
   const base = framingAt(cameras[outcome], time);
   if (time <= timing[outcome].pulseEnd) return base;
   const t = timing[outcome], f = targetFrame(outcome), impact = flightCamera(t.hit,outcome);
@@ -426,6 +370,18 @@ export function cameraAt(time: number, outcome: Outcome) {
   }
   const close = [...position, ...aim, fov, roll], blend = smooth((time - timing[outcome].pulseEnd) * 30);
   return base.map((value, i) => value + (close[i] - value) * blend);
+}
+
+const cameraRails: Partial<Record<Outcome, (time: number) => number[]>> = {};
+export function cameraAt(time: number, outcome: Outcome) {
+  const rail = cameraRails[outcome] ??= smoothCamera(t => [...observedCameraAt(t, outcome), ...ballAt(t, outcome)], DURATION);
+  // Smooth the orbit without letting the rapidly moving flight ball escape
+  // its close-up. Fade the tracking correction before impact so the camera
+  // does not inherit the ball's sudden stop against the target.
+  const values = rail(time), camera = values.slice(0, 8), t = timing[outcome];
+  const anchor = ballAt(time, outcome), blend = smooth((time - (t.exit - .04)) / .14) * (1 - smooth((time - (t.hit - .16)) / .16));
+  for (let i = 0; i < 6; i++) camera[i] += (anchor[i % 3] - values[8 + i % 3]) * blend;
+  return camera;
 }
 
 // The separate oval indicator has its own reference beats, not the pin colors.

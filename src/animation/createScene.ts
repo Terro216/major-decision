@@ -4,13 +4,14 @@ import { Reflector } from 'three/addons/objects/Reflector.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { answerLetters, answerPaths } from '../answerPaths';
 import { pathFor, type Scenario } from './scenario';
-import { ballAt, cameraAt, cameraUp, clamp, DURATION, pinColorEvents, reached, revealRise, smooth, sourceAngleAt, targetAngleAt, timing, track } from './timeline';
+import { ballAt, ballRotation, cameraAt, cameraUp, clamp, DURATION, pinColorEvents, reached, revealRise, smooth, sourceAngleAt, targetAngleAt, timing, track } from './timeline';
 import { add, BALL_RADIUS, fields, mix, mul, PIN_HEIGHT, PIN_RADIUS, side, SOURCE_SCALE, sourcePosition, STAR_RING, TARGET, TUBE, targetFrame, tubePoint, tubeTangent, type Outcome } from './mechanism';
 import { tubeGeometry, wallSorter } from './tubeGeometry';
 import { answerSurface, ballSurface, pinSurface, starEdgeSurface, starSurface, tubeSurface } from './surfaces';
 import { ballRadiance } from './ballRadiance';
 import { backdropGLSL, createBackdrop, openingFloorEdge } from './backdrop';
 import type { FreestyleRun } from './freestyle';
+import { guideGeometries } from './guideGeometry';
 export type ReviewView = 'film' | 'top' | 'side' | 'mouth';
 const COLORS = { yes: '#37bc25', no: '#dc2814', purple: '#b660d0', cyan: '#65aaee' };
 
@@ -325,27 +326,11 @@ export function createScene(canvas: HTMLCanvasElement) {
   world.add(guides);
   const guideMaterial = new THREE.MeshPhongMaterial({ color: '#4079a0', specular: '#c0e7f3', shininess: 75 });
   let guideRun: FreestyleRun | null = null;
-  const guideRail = (points: THREE.Vector3[]) => guides.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(points), Math.max(8, points.length), .10, 8, false), guideMaterial));
-  function updateGuides(run: FreestyleRun | null, path: Outcome) {
+  function updateGuides(run: FreestyleRun | null) {
     if (run === guideRun) return;
     for (const child of guides.children) (child as THREE.Mesh).geometry.dispose();
     guides.clear(); guideRun = run;
-    if (!run) return;
-    const s = side(path), clearance = BALL_RADIUS + .10;
-    for (const x of [-10.5 - clearance, 7.5 + clearance]) guideRail([
-      new THREE.Vector3(s*x,BALL_RADIUS,-9.5-clearance), new THREE.Vector3(s*x,BALL_RADIUS,6.5),
-    ]);
-    guideRail([new THREE.Vector3(s*(-10.5-clearance),BALL_RADIUS,-9.5-clearance),new THREE.Vector3(s*(7.5+clearance),BALL_RADIUS,-9.5-clearance)]);
-    for (const side of [-1, 1]) {
-      const rail = Array.from({ length: 97 }, (_, i) => {
-        const d = run.guideLength*i/96, p = new THREE.Vector3(...run.guidePoint(d));
-        const a = new THREE.Vector3(...run.guidePoint(Math.max(0,d-.01)));
-        const b = new THREE.Vector3(...run.guidePoint(Math.min(run.guideLength,d+.01)));
-        const normal = b.sub(a).cross(new THREE.Vector3(0,1,0)).normalize();
-        return p.addScaledVector(normal,side*clearance);
-      });
-      guideRail(rail);
-    }
+    if (run) for (const geometry of guideGeometries(run)) guides.add(new THREE.Mesh(geometry, guideMaterial));
   }
   let lastTime = 0, lastOutcome: Outcome = 'yes', lastView: ReviewView = 'film', lastOpaque = false, disposed = false;
   let lastScenario: Scenario = 'left';
@@ -357,7 +342,7 @@ export function createScene(canvas: HTMLCanvasElement) {
     lastScenario = scenario;
     lastFreestyle = freestyle;
     const path = pathFor(scenario);
-    updateGuides(freestyle, path);
+    updateGuides(freestyle);
     const t = freestyle?.filmTime(lastTime) ?? lastTime, c = freestyle?.cameraAt(lastTime) ?? cameraAt(t, path), f = targetFrame(path);
     camera.position.set(c[0], c[1], c[2]);
     camera.up.fromArray(cameraUp(c));
@@ -380,11 +365,11 @@ export function createScene(canvas: HTMLCanvasElement) {
     }
     camera.updateProjectionMatrix();
     source.group.position.fromArray(sourcePosition(path));
-    source.group.rotation.z = sourceAngleAt(t, path);
+    source.group.rotation.z = sourceAngleAt(freestyle ? lastTime : t, path);
     ball.position.fromArray(p);
     ball.visible = reached(t,timing[path].release);
     if (freestyle) ball.quaternion.copy(freestyle.rotationAt(lastTime));
-    else ball.rotation.set(t * 2, t * 1.7, t);
+    else ball.quaternion.copy(ballRotation[path](t));
     // Ball radius is constant throughout the journey, including the impact.
     const inTube = reached(t,timing[path].pulseStart) && !reached(t,timing[path].pulseEnd);
     // The source holds a dim entry pose for three left-route frames and two
@@ -458,7 +443,7 @@ export function createScene(canvas: HTMLCanvasElement) {
       branch.target.bevel.shininess=coloredTarget?45:60;
       branch.target.bevel.emissive.copy(branch.target.bevel.color);
       branch.target.bevel.emissiveIntensity=coloredTarget?.012:.020;
-      branch.target.group.rotation.z = targetAngleAt(t,path);
+      branch.target.group.rotation.z = targetAngleAt(freestyle ? timing[path].hit + lastTime - freestyle.events.hit : t,path);
       for (const pin of branch.pins) { pin.material.color.set(COLORS.cyan); pin.material.emissive.set('#254c8e'); pin.material.specular.set('#528fc0'); pin.material.userData.colored.value=0; }
       const pinEvents = freestyle ? freestyle.contacts.map(c => [c.time,c.index,c.color] as const) : pinColorEvents[branch.outcome];
       for (const [change, index, color] of pinEvents) if (reached(freestyle ? lastTime : t,change)) {

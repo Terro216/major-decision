@@ -7,14 +7,39 @@ Freestyle now uses a continuous camera sweep through the pin field, spiral and
 target. Camera movement and aiming follow the ball with different smoothing
 windows, so rebounds remain visible without jolting the entire view. Shot
 transitions share velocity and acceleration; short approaches have extra turning
-time. The seed adds restrained framing variation. Movie trajectories, collision
-geometry, answer selection and sound timing are unchanged. Playback now starts
+time. The seed adds restrained framing variation. Playback now starts
 its clock when the first frame callback actually runs, preventing a slow scene
 preparation from skipping the opening in either mode.
 
 Public documentation contains product and portable development information.
 Deployment-specific configuration and historical working notes are kept outside Git.
 Analytics is optional and configured at build time; a fresh clone sends no analytics.
+
+## Motion refinement — 29 October 2026
+
+The current candidate gives Freestyle at least nine real pin strikes across
+seven distinct pins. Escaped launches are rejected; no perimeter rebound is
+invented. Departures point toward the inlet, and the metal guide rails have
+clearance for the full sphere and stop before the rolled mouth. The obsolete
+perimeter rails have been removed. Ball spin preserves angular momentum across
+normal impacts; both stars rotate on continuous clocks.
+
+Movie retains its authored collision route and recognizable shots while
+reconstructing continuous movement from the film's duplicated exposures. Its
+camera rail, coil progression and final flight no longer reproduce the capture's
+short stops and speed pulses. The close-up composition tests allow the intended
+smoothing; physical clearance, full-ball framing and acceleration remain guarded.
+Freestyle traverses the powered coil in 1.2 seconds with matched entry/exit speed.
+
+The build, 25 geometry/motion/composition checks and all nine mode browser
+scenarios pass. The route sampler completed 1,000 launches; a separate 300-run
+comparison measured 9–24 contacts (mean 18.6), with every pin-free field leg under
+one second. Tests check the actual rail and tube triangles, both mirrored routes,
+full-ball framing, spin continuity, real playback, independent answers and seeks.
+Full-journey 30 fps captures are retained privately for both modes and routes.
+All 41 original reference files still match their manifest. Release verification
+is in progress; these checks do not constitute physical-device or user visual
+acceptance.
 
 ## Playback controls — 29 October 2026
 
@@ -27,7 +52,7 @@ all eight mode/route/answer combinations, including the absence of the removed
 controls throughout playback, Cyrillic input, WebGL, sound and reset. Desktop
 and mobile playing-state screenshots were reviewed; shipped assets match the
 tested build. The [full CI](https://github.com/Terro216/major-decision/actions/runs/40931650127)
-for this revision is still running.
+for this revision passed all 79 scenarios.
 
 ## Camera verification — 28 October 2026
 

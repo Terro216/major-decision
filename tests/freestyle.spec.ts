@@ -10,7 +10,10 @@ test('freestyle: seeded trajectories reflect real contacts, keep momentum and cl
   for (let seed = 0; seed < 100; seed++) {
     const run = createFreestyle(seed, 'left');
     expect(run.duration).toBeLessThan(16);
-    expect(run.contacts.length).toBeGreaterThanOrEqual(4);
+    expect(run.contacts.length).toBeGreaterThanOrEqual(9);
+    expect(new Set(run.contacts.map(c => c.index)).size).toBeGreaterThanOrEqual(7);
+    expect(run.legs.length).toBe(run.contacts.length + 1);
+    for(const leg of run.legs) expect(leg.to-leg.from).toBeLessThan(1);
     fingerprints.add(run.contacts.map(c => c.index).join(','));
     for (const contact of run.contacts) {
       const pin = fields.yes.pins[contact.index].position;

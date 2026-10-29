@@ -8,32 +8,7 @@ import { tubeGeometry, wallSorter } from '../src/animation/tubeGeometry';
 import { fanCamera } from '../src/animation/fanCamera';
 import { inletCamera } from '../src/animation/inletCamera';
 
-// Spatial index of the actual render triangles, not a second idealized tube.
-function wallIndex(geometry: THREE.BufferGeometry) {
-  const p = geometry.attributes.position, ids = geometry.index!;
-  const triangles: THREE.Triangle[] = [], bins = new Map<string, number[]>(), cell = 1.6;
-  const key = (x: number, y: number, z: number) => `${x},${y},${z}`;
-  for (let i = 0; i < ids.count; i += 3) {
-    const vs = [0,1,2].map(k => new THREE.Vector3().fromBufferAttribute(p, ids.getX(i+k)));
-    const tri = new THREE.Triangle(vs[0], vs[1], vs[2]), n = triangles.push(tri) - 1;
-    const box = new THREE.Box3().setFromPoints(vs).expandByScalar(BALL_RADIUS + .17);
-    for (let x=Math.floor(box.min.x/cell); x<=Math.floor(box.max.x/cell); x++)
-      for (let y=Math.floor(box.min.y/cell); y<=Math.floor(box.max.y/cell); y++)
-        for (let z=Math.floor(box.min.z/cell); z<=Math.floor(box.max.z/cell); z++) {
-          const k=key(x,y,z); if (!bins.has(k)) bins.set(k, []); bins.get(k)!.push(n);
-        }
-  }
-  const point = new THREE.Vector3(), closest = new THREE.Vector3();
-  return (p: Vec3) => {
-    point.fromArray(p);
-    let minimum = .17; // Everything outside this bin is farther than r + .17.
-    for (const i of bins.get(key(...p.map(v => Math.floor(v/cell)) as [number,number,number])) ?? []) {
-      triangles[i].closestPointToPoint(point, closest);
-      minimum = Math.min(minimum, point.distanceTo(closest) - BALL_RADIUS);
-    }
-    return minimum;
-  };
-}
+import { wallIndex } from './wallClearance';
 
 test('transparent wall ordering exactly matches a stable depth sort for changing and reflected cameras', () => {
   const geometry = tubeGeometry('yes'), original = Array.from(geometry.index!.array);
@@ -311,7 +286,7 @@ test('motion continuity: acceleration joins the open mouths and rounded helix wi
   await writeFile(path.join(process.env.MD_REVIEW_DIR||'.review','continuity-check.json'),JSON.stringify(report,null,2));
 });
 
-test('motion continuity: source holds complete observed poses and rejoins its later turn', () => {
+test('motion continuity: source accelerates continuously through repeated film exposures', () => {
   for(const outcome of ['yes','no'] as const) {
     const direction=outcome==='yes'?-1:1;
     let previous=sourceAngleAt(0,outcome);
@@ -320,11 +295,10 @@ test('motion continuity: source holds complete observed poses and rejoins its la
       expect((angle-previous)*direction).toBeGreaterThanOrEqual(-1e-10);
       previous=angle;
     }
-    const holds=outcome==='yes'?[[1,2],[3,5],[9,11],[15,16]]:[[0,2],[3,4],[5,7],[9,10],[11,13],[15,16]];
-    for(const [first,last] of holds) for(const u of [.13,.5,.87,1])
-      expect(sourceAngleAt((first+(last-first)*u)/30,outcome)).toBeCloseTo(sourceAngleAt(first/30,outcome),10);
-    const camera=cameraAt(.5,outcome);
-    for(const time of [.505,.52,16/30]) cameraAt(time,outcome).forEach((v,i)=>expect(v).toBeCloseTo(camera[i],9));
+    const start=outcome==='yes'?.02:.09;
+    for(let time=start;time<.8;time+=1/240)
+      expect((sourceAngleAt(time+1/240,outcome)-sourceAngleAt(time,outcome))*direction).toBeGreaterThan(1e-6);
+    expect(length(sub(cameraAt(.52,outcome).slice(0,3) as Vec3,cameraAt(.5,outcome).slice(0,3) as Vec3))).toBeGreaterThan(.01);
     for(const time of [...Array.from({length:25},(_,i)=>i/30),(outcome==='yes'?16:17)/30+.25]) {
       const h=1e-6,a=sourceAngleAt(time,outcome);
       const jump=(s:number)=>Math.abs((-3*a+4*sourceAngleAt(time+s,outcome)-sourceAngleAt(time+2*s,outcome))/(2*s)
@@ -335,7 +309,7 @@ test('motion continuity: source holds complete observed poses and rejoins its la
   }
 });
 
-test('motion continuity: target holds and turns without reversing or jumping', () => {
+test('motion continuity: target turns and settles without exposure holds, reversals or jumps', () => {
   for(const outcome of ['yes','no'] as const) {
     const direction=outcome==='yes'?-1:1;
     let previous=targetAngleAt(5,outcome);
@@ -344,15 +318,10 @@ test('motion continuity: target holds and turns without reversing or jumping', (
       expect((angle-previous)*direction,`${outcome} reverses at ${time}`).toBeGreaterThanOrEqual(-1e-10);
       previous=angle;
     }
-    // Source holds constrain a whole interval, including arbitrary seeks.
-    const holds=outcome==='yes'?[[163,166],[167,169],[171,173],[176,178]]:[[165,166],[168,170],[172,173],[174,175],[176,177]];
-    for(const [first,last] of holds) for(const u of [.13,.5,.87,1])
-      expect(targetAngleAt((first+(last-first)*u)/30,outcome)).toBeCloseTo(targetAngleAt(first/30,outcome),10);
-    const cameraHolds=outcome==='yes'?[[171,173]]:[[172,173],[174,175],[176,177]];
-    for(const [first,last] of cameraHolds) for(const u of [.13,.5,.87,1]) {
-      const start=cameraAt(first/30,outcome),pose=cameraAt((first+(last-first)*u)/30,outcome);
-      pose.forEach((v,i)=>expect(v).toBeCloseTo(start[i],10));
-    }
+    const stop=outcome==='yes'?timing.yes.color+.18:DURATION;
+    for(let time=5.3;time<stop;time+=1/240)
+      expect((targetAngleAt(time+1/240,outcome)-targetAngleAt(time,outcome))*direction).toBeGreaterThan(1e-7);
+    if(outcome==='yes') expect(targetAngleAt(6.3,outcome)).toBe(targetAngleAt(DURATION,outcome));
     for(let frame=159;frame<=196;frame++) {
       const time=frame/30,h=1e-6,a=targetAngleAt(time,outcome);
       const jump=(step:number)=>Math.abs(
