@@ -17,7 +17,8 @@ Analytics is optional and configured at build time; a fresh clone sends no analy
 
 ## Playback reliability — 10 November 2026
 
-Freestyle keeps the violet floor and sky illumination throughout the final
+Application revision `abb16b1` is released. Freestyle keeps the violet floor and
+sky illumination throughout the final
 flight, then blends into the target glow. The abrupt dark cue from the authored
 Movie sequence no longer applies to Freestyle.
 
@@ -30,9 +31,12 @@ working buttons and selectors use the pointer cursor and retain keyboard focus.
 The baseline reproduced a second three-note chord on the first tab return and
 a near-black background during both Freestyle approaches. The build, 17
 playback/audio/accessibility scenarios and two rendered background regressions
-pass. Desktop/mobile controls and cursor states also pass; release verification
-is in progress. Before/after flight sequences
-are retained privately; all 41 film reference files still match their manifest.
+pass. Candidate and public HTTPS checks each passed all eight mode/route/answer
+combinations plus desktop/mobile controls and cursor states. Shipped assets match
+the tested build. Before/after flight sequences and interface captures are
+retained privately; all 41 film reference files still match their manifest.
+The [full CI](https://github.com/Terro216/major-decision/actions/runs/42701656069)
+is still running at this release handoff.
 
 ## Motion refinement — 29 October 2026
 
