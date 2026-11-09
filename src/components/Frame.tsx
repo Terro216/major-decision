@@ -35,7 +35,7 @@ function IconDrawing({ kind }: { kind: 'hand' | 'orbit' | 'blocks' | 'columns' }
 }
 
 function SmallIcon({ kind, x, y, radius }: { kind: 'hand' | 'orbit' | 'blocks' | 'columns'; x: number; y: number; radius: number }) {
-  return <g transform={`translate(${x} ${y})`}>
+  return <g className="decorative-control" transform={`translate(${x} ${y})`}>
     <circle cy="-3" r={radius + 10} fill="#071e53"/>
     <circle r={radius + 4} fill="url(#icon-bezel)"/>
     <circle r={radius - 7} fill={kind === 'blocks' ? '#3b9ac5' : 'url(#icon-face)'} stroke="#214880" strokeWidth="4"/>
@@ -91,9 +91,11 @@ export function Frame() {
     <path d="M42 853q6 29 27 43M357 756q72 22 80 66" fill="none" stroke="#b2f5fa" strokeWidth="3"/>
     <path d="M421 902H1488q18 0 19 13" fill="none" stroke="#071a40" strokeWidth="15"/>
     <path d="M421 895H1486q17 0 20 14" fill="none" stroke="#5085b4" strokeWidth="3"/>
+    <g className="decorative-control">
     <circle cx="1543" cy="907" r="23" fill="#152047" stroke="#59657c" strokeWidth="3"/>
     <circle cx="1543" cy="907" r="16" fill="#492d58"/>
     <path d="M1532 908h22" stroke="#9a699c" strokeWidth="3"/>
+    </g>
   </svg>;
 }
 

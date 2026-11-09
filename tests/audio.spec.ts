@@ -73,6 +73,52 @@ test('sound pauses in the background, cancels scheduled notes on reset and reuse
   expect(await page.evaluate(()=>(window as any).audioContexts.length)).toBe(1);
 });
 
+for (const reducedMotion of [false, true]) {
+  test(`a completed answer stays silent on tab return and sound toggles (reduced motion: ${reducedMotion})`, async ({ page }) => {
+    test.setTimeout(180_000);
+    await observeAudio(page);
+    await page.emulateMedia({ reducedMotion: reducedMotion ? 'reduce' : 'no-preference' });
+    await page.addInitScript(() => {
+      (window as any).testHidden = false;
+      (window as any).startedNotes = 0;
+      Object.defineProperty(document, 'hidden', { get: () => (window as any).testHidden });
+      const create = AudioContext.prototype.createOscillator;
+      AudioContext.prototype.createOscillator = function () {
+        const oscillator = create.call(this), start = oscillator.start.bind(oscillator);
+        oscillator.start = (when = 0) => { (window as any).startedNotes++; start(when); };
+        return oscillator;
+      };
+    });
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Freestyle', exact: true }).click();
+    const sound = page.getByRole('button', { name: /^SOUND/ });
+    await sound.click();
+    await page.getByRole('textbox').fill('Один ответ — один финальный звук?');
+    await page.getByRole('button', { name: 'Ask the question' }).click();
+    await expect(page.getByRole('status')).toBeVisible({ timeout: 35_000 });
+    const count = () => page.evaluate(() => (window as any).startedNotes as number);
+    const completed = await count();
+    expect(completed).toBeGreaterThanOrEqual(3);
+    for (let i = 0; i < 3; i++) {
+      await page.evaluate(() => { (window as any).testHidden = true; document.dispatchEvent(new Event('visibilitychange')); });
+      await expect.poll(() => page.evaluate(() => (window as any).audioContexts[0].state)).toBe('suspended');
+      await page.evaluate(() => { (window as any).testHidden = false; document.dispatchEvent(new Event('visibilitychange')); });
+      await expect.poll(() => page.evaluate(() => (window as any).audioContexts[0].state)).toBe('running');
+      await page.waitForTimeout(100);
+      expect(await count(), `tab return ${i + 1}`).toBe(completed);
+    }
+    await sound.click(); await sound.click();
+    await expect(sound).toHaveAttribute('aria-pressed', 'true');
+    expect(await count(), 'enabling sound must not replay an old result').toBe(completed);
+    await page.getByRole('button', { name: 'NEW QUESTION' }).click();
+    await page.getByRole('textbox').fill('Следующий ответ всё ещё со звуком?');
+    await page.getByRole('button', { name: 'Ask the question' }).click();
+    await expect.poll(count).toBeGreaterThan(completed);
+    await expect(page.getByRole('status')).toBeVisible({ timeout: 35_000 });
+    expect(await page.evaluate(() => (window as any).audioContexts.length)).toBe(1);
+  });
+}
+
 test('audio failure leaves the selected answer and reset usable', async ({ page }) => {
   await page.emulateMedia({reducedMotion:'reduce'});
   await page.addInitScript(()=>{ window.AudioContext=class { constructor(){throw new Error('Audio unavailable');} } as any; });

@@ -94,10 +94,16 @@ export class DecisionAudio {
     if (!heard) this.notes(resultNotes(outcome), 0);
   }
 
-  stop() {
+  stop(immediate = false) {
     for (const { oscillator, envelope } of this.voices) {
-      // Ramp an audible note down rather than cutting a waveform abruptly.
       const now = this.context?.currentTime || 0;
+      if (immediate) {
+        // Suspending freezes audio time. Disconnect now so a frozen fade or
+        // queued note cannot sound briefly when the tab becomes visible again.
+        oscillator.stop(now); oscillator.disconnect(); envelope.disconnect();
+        continue;
+      }
+      // Ramp an audible note down rather than cutting a waveform abruptly.
       if (typeof envelope.gain.cancelAndHoldAtTime === 'function') {
         envelope.gain.cancelAndHoldAtTime(now);
       } else {
@@ -114,7 +120,7 @@ export class DecisionAudio {
     this.answerAt = Infinity;
   }
 
-  async suspend() { this.stop(); if (this.context?.state === 'running') await this.context.suspend(); }
+  async suspend() { this.stop(true); if (this.context?.state === 'running') await this.context.suspend(); }
   async resume() { if (this.context?.state === 'suspended') await this.context.resume(); }
   dispose() { this.stop(); void this.context?.close().catch(() => {}); this.context = null; this.master = null; }
 }

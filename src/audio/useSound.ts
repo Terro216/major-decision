@@ -10,6 +10,7 @@ export function useSound(decision: Decision, rate: number) {
   const [error, setError] = useState('');
   const [visible, setVisible] = useState(!document.hidden);
   const { phase, outcome, scenario, time, playing, freestyle } = decision;
+  const previousPhase = useRef(phase);
 
   useEffect(() => {
     const visibility = async () => {
@@ -24,10 +25,14 @@ export function useSound(decision: Decision, rate: number) {
   }, []);
 
   useEffect(() => {
+    // A result sound belongs to entering the answer, not to restoring audio
+    // after tab visibility or SOUND changes. Observe silent results as well.
+    const enteringResult = phase === 'result' && previousPhase.current !== 'result';
+    previousPhase.current = phase;
     const sound = engine.current;
     if (!sound) return;
     if (!enabled || !visible) { sound.stop(); return; }
-    if (phase === 'result') sound.finish(outcome);
+    if (phase === 'result') { if (enteringResult) sound.finish(outcome); }
     else if (phase === 'running' && playing) sound.play(scenario, outcome, time, rate, freestyle);
     else sound.stop();
     // time deliberately supplies the start point only. Re-scheduling each RAF

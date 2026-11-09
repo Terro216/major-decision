@@ -474,8 +474,10 @@ export function createScene(canvas: HTMLCanvasElement) {
     mirror.uniforms.latePanelColor.value=latePanel;
     mirror.uniforms.routeSide.value=side(path);
     backdrop.material.uniforms.routeSide.value=side(path);
-    mirror.uniforms.openingCut.value=1-smooth((t-.70)/.40)+smooth((t-(timing[path].pulseEnd-.13))/.13);
-    mirror.uniforms.farShade.value=smooth((t-(path==='yes'?158/30:161/30))/(1/30));
+    // Freestyle keeps the light through its continuous flight. The film's
+    // abrupt dark floor/sky cue belongs only to its authored camera sequence.
+    mirror.uniforms.openingCut.value=1-smooth((t-.70)/.40)+(freestyle?0:smooth((t-(timing[path].pulseEnd-.13))/.13));
+    mirror.uniforms.farShade.value=freestyle?0:smooth((t-(path==='yes'?158/30:161/30))/(1/30));
     backdrop.material.uniforms.flightDark.value=mirror.uniforms.farShade.value;
     // Shared world-space halo/core fitted to both opening views. The changing
     // floor intersection is inferred illumination, not an original lamp rig.
@@ -514,7 +516,9 @@ export function createScene(canvas: HTMLCanvasElement) {
     pinFill.target.position.set(side(path)*3.5,.5,-.5);
     pinFill.target.updateMatrixWorld();
     pinFill.intensity=100*(1-finishMix);
-    const backgroundFinish = smooth((t-(timing[path].hit-2/30))/(2/30));
+    const backgroundFinish = freestyle
+      ? smooth((lastTime-freestyle.events.exit)/(freestyle.events.hit-freestyle.events.exit))
+      : smooth((t-(timing[path].hit-2/30))/(2/30));
     mirror.uniforms.finish.value = backgroundFinish;
     backdrop.material.uniforms.finish.value = backgroundFinish;
     // The lower pool is already visible while the word enters the film frame.

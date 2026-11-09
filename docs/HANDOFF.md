@@ -15,6 +15,25 @@ Public documentation contains product and portable development information.
 Deployment-specific configuration and historical working notes are kept outside Git.
 Analytics is optional and configured at build time; a fresh clone sends no analytics.
 
+## Playback reliability — 10 November 2026
+
+Freestyle keeps the violet floor and sky illumination throughout the final
+flight, then blends into the target glow. The abrupt dark cue from the authored
+Movie sequence no longer applies to Freestyle.
+
+Result audio is triggered only when an answer appears. Returning to a completed
+tab or enabling SOUND afterward stays silent; a new question still has its own
+score. Suspending audio disconnects queued voices so their frozen tails cannot
+play on return. Disabled sections and decorative film controls are subdued;
+working buttons and selectors use the pointer cursor and retain keyboard focus.
+
+The baseline reproduced a second three-note chord on the first tab return and
+a near-black background during both Freestyle approaches. The build, 17
+playback/audio/accessibility scenarios and two rendered background regressions
+pass. Desktop/mobile controls and cursor states also pass; release verification
+is in progress. Before/after flight sequences
+are retained privately; all 41 film reference files still match their manifest.
+
 ## Motion refinement — 29 October 2026
 
 Application revision `71604ac` is released. Freestyle now gives at least nine
@@ -44,7 +63,7 @@ build. Full-journey 30 fps captures are retained privately for both modes and
 routes, with browser playback, pause, seek and quarter-speed checks. All 41
 original reference files still match their manifest. The
 [full CI](https://github.com/Terro216/major-decision/actions/runs/40948150947)
-is still running at this release handoff. These checks do not constitute
+completed successfully. These checks do not constitute
 physical-device or user visual acceptance.
 
 ## Playback controls — 29 October 2026

@@ -10,9 +10,9 @@ const symbols = [
 
 export function BrowserFrame() {
   return <div className="browser-frame" aria-hidden="true">
-    <div className="browser-menubar">File&nbsp;&nbsp; Edit&nbsp;&nbsp; View&nbsp;&nbsp; Go&nbsp;&nbsp; Bookmarks&nbsp;&nbsp; Internet&nbsp;&nbsp; Applications<span>Help</span></div>
-    <div className="browser-title">web access: decision.ilyamedve.dev<span className="window-controls">▣ ▰</span></div>
-    <div className="browser-toolbar">{symbols.map(([name, path]) => <div className="browser-tool" key={name}><svg viewBox="0 0 48 40"><path d={path}/></svg><span>{name}</span></div>)}<div className="browser-spacer"/><span className="browser-network">⌁&nbsp; ◈&nbsp; ☏&nbsp; ⌂</span><div className="browser-globe">e</div></div>
+    <div className="browser-menubar decorative-control">File&nbsp;&nbsp; Edit&nbsp;&nbsp; View&nbsp;&nbsp; Go&nbsp;&nbsp; Bookmarks&nbsp;&nbsp; Internet&nbsp;&nbsp; Applications<span>Help</span></div>
+    <div className="browser-title">web access: decision.ilyamedve.dev<span className="window-controls decorative-control">▣ ▰</span></div>
+    <div className="browser-toolbar decorative-control">{symbols.map(([name, path]) => <div className="browser-tool" key={name}><svg viewBox="0 0 48 40"><path d={path}/></svg><span>{name}</span></div>)}<div className="browser-spacer"/><span className="browser-network">⌁&nbsp; ◈&nbsp; ☏&nbsp; ⌂</span><div className="browser-globe">e</div></div>
     <div className="browser-address"><span>Location:</span><div>https://decision.ilyamedve.dev</div></div>
   </div>;
 }
