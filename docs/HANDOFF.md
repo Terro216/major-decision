@@ -36,10 +36,19 @@ captures at widths 320, 390 and 1366; browser errors and horizontal overflow are
 Desktop/mobile WCAG A/AA checks pass. Visual captures and loading evidence are
 retained privately; all 41 film references still match their manifest.
 
+Application revision `1afb284` is released. The image's assets match an independent
+build with the same analytics configuration. Candidate and public HTTPS smoke
+checks each passed all eight mode/route/answer combinations and both language pages
+without JavaScript. All 17 public files match the release image; HTTPS redirection,
+language redirection, diagnostic `noindex` and both film timestamps are verified.
+Release smoke screenshots now capture the viewport with a bounded 60-second budget
+so the longer description does not make software-rendered captures time out.
+
 Throttled laboratory loading checks recorded zero layout shift. The main 3D bundle
 remains approximately 269 kB gzip; deferred loading and field Core Web Vitals remain
-separate performance work. Search-console setup and production publication remain
-pending. No commit, push or deployment is included in this change.
+separate performance work. Search-console setup remains pending. The
+[full CI](https://github.com/Terro216/major-decision/actions/runs/42745878968)
+is running at this release handoff.
 
 ## Playback reliability — 10 November 2026
 

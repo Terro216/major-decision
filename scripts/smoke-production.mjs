@@ -85,7 +85,9 @@ try {
       assert.equal(await page.evaluate(()=>localStorage.length+sessionStorage.length),0);
       assert(requests.every(url=>url.startsWith(origin+'/')||(metricsOrigin && new URL(url).origin === metricsOrigin)),JSON.stringify(requests));
       assert.equal(new URL(page.url()).search,'');
-      await page.screenshot({path:`${directory}/${mode}-${scenario}-${outcome}.png`,fullPage:true});
+      // The description extends below the machine. Capture the viewport to
+      // keep software-rendered screenshots within a bounded capture budget.
+      await page.screenshot({path:`${directory}/${mode}-${scenario}-${outcome}.png`,fullPage:false,timeout:60000});
       await page.getByRole('button',{name:/^SOUND/}).click();
       await page.waitForFunction(()=>[...document.querySelectorAll('button')].find(button=>button.textContent.startsWith('SOUND'))?.getAttribute('aria-pressed')==='true');
       assert.equal(await page.getByRole('button',{name:/^SOUND/}).getAttribute('aria-pressed'),'true');
