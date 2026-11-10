@@ -74,8 +74,7 @@ export function App() {
     }
   };
 
-  return <main className={`page ${cinema ? 'with-browser' : 'without-browser'}`}>
-    <h1 className="visually-hidden">Major Decision</h1>
+  return <main className={`page ${cinema ? 'with-browser' : 'without-browser'}`} lang="en" aria-label="Major Decision">
     <div className="terminal-fit" ref={fit}>
       <div className="terminal-surface" style={{ transform: `scale(${scale})` }}>
         {cinema && <Browser />}

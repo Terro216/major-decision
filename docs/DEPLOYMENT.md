@@ -21,3 +21,11 @@ shared infrastructure for a single-site update.
 The image excludes film references, development reports, source history and local
 configuration. Recovery consists of rebuilding a known source revision and supplying
 the installation's private configuration. Store release-specific records privately.
+
+The build emits an English page at `/`, a Russian page at `/ru/`, `robots.txt`
+and `sitemap.xml`. Localized descriptions and search metadata are generated from
+`src/siteContent.ts`; update its public origin when using a different domain.
+Both pages use the same application assets and declare reciprocal language links.
+The nginx configuration redirects `/ru` to `/ru/` and sends `X-Robots-Tag: noindex`
+for diagnostic requests with `review=1`. The application also sets a matching
+robots meta tag. Keep diagnostic URLs out of the sitemap and public navigation.

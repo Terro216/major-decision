@@ -6,6 +6,9 @@
 
 **[Открыть сайт](https://decision.ilyamedve.dev)**
 
+Описание проекта: [English](https://decision.ilyamedve.dev/) ·
+[Русский](https://decision.ilyamedve.dev/ru/).
+
 ## Возможности
 
 - **Movie** — две постановочные траектории по мотивам фильма.

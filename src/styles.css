@@ -4,6 +4,7 @@
 *{box-sizing:border-box}
 html,body,#root{margin:0;min-width:320px;min-height:100%}
 body{min-height:100svh;background:radial-gradient(ellipse at 50% 35%,#19294a 0,#0a142c 55%,#050a17 100%)}
+#root{min-height:100svh}
 button,textarea{font:inherit}
 button{touch-action:manipulation}
 button:enabled,select:enabled,input[type=range],input[type=checkbox]{cursor:pointer}
@@ -101,6 +102,29 @@ button:focus-visible{outline:4px solid #e9e7ab;outline-offset:5px}
 select:focus-visible{outline:3px solid #e9e7ab;outline-offset:3px}
 .sound-error{font-size:12px;color:#ffb4a3}
 ::selection{background:#b9dcef;color:#08142b}
+
+.about-project{width:min(calc(100% - 40px),760px);margin:48px auto 0;padding:24px 0 max(48px,env(safe-area-inset-bottom));border-top:1px solid #354b6b;color:#c2d5ef;font-size:16px;line-height:1.7;overflow-wrap:break-word}
+.about-project h1{margin:24px 0 16px;color:#e7cd68;font:700 clamp(26px,3.5vw,36px)/1.2 Film Question,Georgia,serif;text-wrap:balance}
+.about-project h2{margin:30px 0 10px;color:#e4edf9;font-size:19px;line-height:1.35}
+.about-project p{margin:0 0 16px}
+.about-project .about-intro{font-size:18px;line-height:1.65}
+.about-project a{color:#b9dcef;text-decoration-thickness:1px;text-underline-offset:4px}
+.about-project a:hover{color:#fff}
+.about-project a:focus-visible{outline:3px solid #e9e7ab;outline-offset:5px;border-radius:2px}
+.language-nav{display:flex;gap:20px;align-items:center;font-size:14px}
+.language-nav a{display:inline-flex;align-items:center;min-height:44px}
+.language-nav [aria-current=page]{color:#e7cd68;text-decoration:none;font-weight:700}
+.mode-descriptions{margin:20px 0}
+.mode-descriptions>div{display:grid;grid-template-columns:85px minmax(0,1fr);gap:16px;margin:10px 0}
+.mode-descriptions dt{font-weight:700;color:#e4edf9}
+.mode-descriptions dd{margin:0}
+.film-links{list-style:none;margin:0;padding:0}
+.film-links li{margin:8px 0}
+.film-links a{display:inline-block;padding:6px 0}
+.film-links span{display:inline-block;margin-left:8px;font-size:14px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.about-project .project-source{margin:28px 0 0;font-size:14px}
+.script-notice{padding:12px 0;color:#e7cd68}
+@media(max-width:700px){.about-project{width:calc(100% - 32px);margin-top:32px;padding-top:16px}.about-project .about-intro{font-size:17px}.mode-descriptions>div{grid-template-columns:75px minmax(0,1fr);gap:12px}}
 
 /* The phone has its own arrangement of the same blue case and medallions.
    Its stage retains the film aspect ratio and the exact desktop camera. */

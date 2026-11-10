@@ -15,6 +15,32 @@ Public documentation contains product and portable development information.
 Deployment-specific configuration and historical working notes are kept outside Git.
 Analytics is optional and configured at build time; a fresh clone sends no analytics.
 
+## Bilingual discovery — 10 November 2026
+
+The build now emits complete English HTML at `/` and Russian HTML at `/ru/`.
+Descriptions, instructions, mode explanations and question privacy remain readable
+without JavaScript. The machine retains its English film labels. Both pages have
+localized titles and descriptions, self-referencing canonical URLs, reciprocal
+language links and Open Graph/Twitter previews using an application screenshot.
+Film links open the supplied YouTube source at 06:36 and 08:35 in a separate tab.
+
+The sitemap lists both public pages. Robots permits crawling; diagnostic requests
+with `review=1` receive an nginx `noindex` header and a matching application meta
+tag. `/ru` redirects to `/ru/` while retaining query parameters. Space is reserved
+for the application while JavaScript loads.
+
+The build and five SEO integration scenarios pass, including JavaScript-disabled
+navigation, the preview image's actual PNG dimensions, Cyrillic input and question
+privacy. The isolated nginx candidate passes 11 HTTP checks and six language/viewport
+captures at widths 320, 390 and 1366; browser errors and horizontal overflow are absent.
+Desktop/mobile WCAG A/AA checks pass. Visual captures and loading evidence are
+retained privately; all 41 film references still match their manifest.
+
+Throttled laboratory loading checks recorded zero layout shift. The main 3D bundle
+remains approximately 269 kB gzip; deferred loading and field Core Web Vitals remain
+separate performance work. Search-console setup and production publication remain
+pending. No commit, push or deployment is included in this change.
+
 ## Playback reliability — 10 November 2026
 
 Application revision `abb16b1` is released. Freestyle keeps the violet floor and
